@@ -11,6 +11,18 @@ pub enum RMIError {
 
     #[error("Transport error: {0}")]
     TransportError(String),
+
+    #[error("Method not found: {0}")]
+    MethodNotFound(String),
+
+    #[error("Bad arguments for method: {0}")]
+    BadArguments(String),
+
+    #[error("Object not found with id: {0}")]
+    ObjectNotFound(u64),
+
+    #[error("IO error: {0}")]
+    IoError(#[from] std::io::Error),
 }
 
 pub type RMIResult<T> = Result<T, RMIError>;

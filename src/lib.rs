@@ -3,3 +3,5 @@ mod stub;
 mod remote;
 mod error;
 mod tcp;
+mod skeleton;
+mod registry;

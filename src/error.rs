@@ -13,4 +13,4 @@ pub enum RMIError {
     TransportError(String),
 }
 
-pub type RMIREsult<T> = Result<T, RMIError>;
+pub type RMIResult<T> = Result<T, RMIError>;

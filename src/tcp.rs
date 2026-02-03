@@ -6,9 +6,10 @@ use tokio::net::{TcpListener, TcpStream};
 use async_trait::async_trait;
 
 use crate::transport::{RMIRequest, RMIResponse, Transport};
-use crate::error::{RMIResult,RMIError};
+use crate::error::RMIError;
 use crate::registry::{Registry};
 use crate::skeleton::{Skeleton};
+use crate::remote::{RMIResult};
 
 
 pub struct TcpTransport{
@@ -120,8 +121,7 @@ impl TcpServer{
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::skeleton::RemoteObject;
-    use crate::remote::RemoteRef;
+    use crate::remote::{RemoteRef,RemoteObject};
     use crate::stub::{Stub, RemoteTrait};
     use std::time::Duration;
     

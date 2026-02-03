@@ -1,7 +1,7 @@
 use std::sync::Arc;
-use crate::remote::RemoteRef;
+use crate::remote::{RemoteRef,RMIResult};
 use crate::transport::{RMIRequest, Transport};
-use crate::error::{RMIError,RMIResult};
+use crate::error::RMIError;
 use async_trait::async_trait;
 
 type ReturnType = i32;

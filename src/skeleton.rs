@@ -1,12 +1,6 @@
-use async_trait::async_trait;
-
-use crate::error::{RMIResult};
+use crate::remote::RemoteObject;
 use crate::transport::{RMIRequest, RMIResponse};
 
-#[async_trait]
-pub trait RemoteObject: Send + Sync{
-    async fn run(&self, method_name: &str, args: Vec<u8>) -> RMIResult<Vec<u8>>;
-}
 
 pub struct Skeleton{
 }

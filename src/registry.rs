@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use crate::error::{RMIError, RMIResult};
-use crate::skeleton::RemoteObject;
+use crate::error::RMIError;
+use crate::remote::{RemoteObject,RMIResult};
 
 pub struct Registry{// a hashmap with all objects
     objects: Arc<RwLock<HashMap<u64,Arc<dyn RemoteObject>>>>,// hashmap and objects should be thread safe

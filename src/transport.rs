@@ -1,6 +1,6 @@
 use serde::{Serialize,Deserialize};
 use async_trait::async_trait;
-use crate::error::RMIResult;
+use crate::remote::RMIResult;
 
 #[derive(Serialize,Deserialize,Debug,Clone)]
 pub struct RMIRequest{

@@ -1,6 +1,5 @@
 use serde::{Serialize,Deserialize};
-use async_trait::async_trait;
-use crate::remote::RMIResult;
+use crate::{error::RMIError, remote::RMIResult};
 
 #[derive(Serialize,Deserialize,Debug,Clone,PartialEq)]
 pub struct RMIRequest{
@@ -16,7 +15,7 @@ impl RMIRequest{
 
 #[derive(Serialize,Deserialize,Debug,Clone)]
 pub struct RMIResponse{
-    pub result: Result<Vec<u8>, String>
+    pub result: RMIResult<Vec<u8>>,
 }
 
 impl RMIResponse{
@@ -27,12 +26,11 @@ impl RMIResponse{
     }
     pub fn error(msg: String) -> Self{
         RMIResponse { 
-            result: Err(msg),
+            result: Err(RMIError::TransportError(msg)),
         }
     }
 }
 
-#[async_trait]// need this for Send trait, otherwise cannot use dyn Transport
 pub trait Transport: Send + Sync{
-    async fn send(&self, req: RMIRequest) -> RMIResult<RMIResponse>;
+    fn send(&self, req: RMIRequest) -> RMIResult<RMIResponse>;
 }

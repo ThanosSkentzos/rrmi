@@ -10,12 +10,12 @@ impl Skeleton{
         Skeleton {}
     }
 
-    pub async fn handle_request(
+    pub fn handle_request(
         &self,
         request: RMIRequest,
         object: &dyn RemoteObject,
     ) -> RMIResponse{
-        match object.run(&request.method_handler, request.serialized_args).await{
+        match object.run(&request.method_handler, request.serialized_args){
             Ok(result) => RMIResponse::success(result),
             Err(e) => RMIResponse::error(format!("{e}")),
         }

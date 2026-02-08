@@ -1,10 +1,11 @@
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-#[derive(Error,Debug)]
+#[derive(Error,Debug,Clone,Serialize,Deserialize)]
 pub enum RMIError {
 
     #[error("Serialization error: {0}")]
-    SerializationError(#[from] serde_cbor::Error),
+    SerializationError(String),
 
     #[error("Server error: {0}")]
     ServerError(String),
@@ -22,5 +23,5 @@ pub enum RMIError {
     ObjectNotFound(u64),
 
     #[error("IO error: {0}")]
-    IoError(#[from] std::io::Error),
+    IoError(String),
 }

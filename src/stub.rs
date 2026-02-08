@@ -32,10 +32,10 @@ impl RemoteTrait for Stub{
 
         let req = RMIRequest{
             object_id: self.remote.id,
-            method_handler: "method_name".into(),
+            method_name: "method_name".into(),
             serialized_args,
         };
-        let ip = Ipv4Addr::new(127, 0, 0, 1);//TODO registry should give ip from remote object
+        let ip = Ipv4Addr::new(127, 0, 0, 1);//TODO local registry should give ip from remote object
         let ip: IpAddr = IpAddr::V4(ip);
         let port = 9999;
         let server_addr = SocketAddr::new(ip, port);

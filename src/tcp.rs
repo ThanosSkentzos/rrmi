@@ -1,9 +1,6 @@
 use std::io::{Write,Read};
-use std::net::{SocketAddr, TcpListener};
+use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::Arc;
-
-use std::net::TcpStream;
-use std::thread::spawn;
 
 use crate::transport::{RMIRequest, RMIResponse, Transport};
 use crate::error::RMIError;
@@ -70,41 +67,37 @@ impl TcpServer{
         let listener = TcpListener::bind(addr)
             .map_err(|e| RMIError::TransportError(e.to_string()))?;
         println!("RMI Server listening on {}", addr);
-        loop{
-            match listener.accept(){
-                Ok((stream, client_addr)) => {
+        for stream in listener.incoming(){
+            match stream{
+                Ok(stream) => {
+                    let client_addr = stream.peer_addr().unwrap_or_else(|_|{"unknown".parse().unwrap()});
                     println!("New connection from {}", client_addr);
-                    let registry = Arc::clone(&self.registry);
-                    let skeleton = Arc::clone(&self.skeleton);
 
-                    spawn(move || {
-                        if let Err(e) = Self::handle_connection(stream, registry, skeleton){
-                            eprintln!("Error handling connection from {}: {}", client_addr, e);
-                        }
-                    });
+                    if let Err(e) = &self.handle_connection(stream){
+                        eprintln!("Error handling connection from {}: {}", client_addr, e);
+                    }
                 },
                 Err(e) => {
                     eprintln!("Error accepting connection: {}",e)
                 }
             }
         }
+        Ok(())
     }
 
-    fn handle_connection(
-        mut stream: TcpStream,
-        registry: Arc<Registry>,
-        skeleton: Arc<Skeleton>,
-    ) -> RMIResult<()>{
+    fn handle_connection(&self,mut stream: TcpStream) -> RMIResult<()>{
         let mut len_bytes = [0u8; 4];
         let _ = stream.read_exact(&mut len_bytes);
         let len = u32::from_be_bytes(len_bytes) as usize;
 
-        let request_bytes = vec![0u8; len]; // same thing as when client gets RMIResponse
+        let mut request_bytes = vec![0u8; len]; // same thing as when client gets RMIResponse
+        let _ = stream.read_exact(&mut request_bytes);
         let request: RMIRequest = serde_cbor::from_slice(&request_bytes)
                         .map_err(|e| RMIError::SerializationError(e.to_string()))?;
+        println!("Received request for object_id= {}, method= {}",request.object_id,request.method_name);
 
-        let object = registry.get(request.object_id)?;
-        let response = skeleton.handle_request(request, object.as_ref());
+        let object = self.registry.get(request.object_id)?;
+        let response = self.skeleton.handle_request(request, object.as_ref());
 
         let response_bytes = serde_cbor::to_vec(&response)
                         .map_err(|e| RMIError::SerializationError(e.to_string()))?;
@@ -114,6 +107,92 @@ impl TcpServer{
         stream.write_all(&response_bytes).map_err(|e| RMIError::TransportError(e.to_string()))?;
         stream.flush().map_err(|e| RMIError::TransportError(e.to_string()))?;//same thing as when client sends RMIRequest
 
+        println!("Response sent.");
         Ok(())
+    }
+}
+
+
+#[cfg(test)]
+mod tests{
+    use core::{panic, time};
+    use std::{fmt::Debug,thread};
+    use serde::Deserialize;
+
+    use super::*;
+
+    fn get_local_addr()->SocketAddr{
+        let hostname = "localhost";
+        let ips: Vec<std::net::IpAddr> = dns_lookup::lookup_host(hostname).unwrap().collect();
+        println!("{hostname} ips: {:?}",ips);
+        let port = 1099;
+        SocketAddr::new(ips[0], port)// TODO for now use 1st entry
+    }
+    fn get_server_ip(hostname:&str)->SocketAddr{
+        let ips: Vec<std::net::IpAddr> = dns_lookup::lookup_host(hostname).unwrap().collect();
+        println!("{hostname} ips: {:?}",ips);
+        if ips.len()==0{//TODO this should be error not panic
+            panic!("unable to resolve hostname: {hostname}")
+        }
+        let port = 1099;
+        SocketAddr::new(ips[0], port)// TODO for now use 1st entry
+    }
+
+    fn send_data(data_serial:Vec<u8>,addr:SocketAddr){
+        println!("Client sending to {addr}");
+        let mut stream = TcpStream::connect(addr.to_string()).expect("client stream should be able to connect");
+        let len = data_serial.len() as u32;
+        let _ = stream.write_all(&len.to_be_bytes()).expect("should be able to write len");
+        let _ = stream.write_all(&data_serial).expect("then send data stream");
+        let _ = stream.flush().expect("make sure we send this");
+    }
+
+    fn receive_data<T: for<'de> Deserialize<'de> + Debug + PartialEq>(addr:SocketAddr) -> T{
+        let listener = TcpListener::bind(addr.to_string()).expect("port should be available");
+        println!("Server listening on {addr}");
+        let stream = listener.accept();
+        match stream {
+            Ok((mut stream,_addr))=>{
+                let mut len_bytes = [0u8; 4];
+                let _ = stream.read_exact(&mut len_bytes);
+                let len = u32::from_be_bytes(len_bytes) as usize;
+                let mut request_bytes = vec![0u8; len]; // same thing as when client gets RMIResponse
+                let _ = stream.read_exact(&mut request_bytes);
+                let data_recv: T = serde_cbor::from_slice(&request_bytes).expect("type should be deserializable");
+                println!("Server received data {:?}",data_recv);
+                data_recv 
+            },
+            Err(e) => panic!("Error accepting connection: {}",e)
+        }
+    }
+
+    #[test]
+    fn local_send() {
+        let int:i32 = 1234567890;
+        let int_bytes = serde_cbor::to_vec(&int).expect("int is serializable");
+        println!("data: {:?}",int);
+        println!("serialized: {:?}",int_bytes);
+        thread::sleep(time::Duration::from_millis(10));//at first was failing randomly, probably race condition with server thread
+        let addr = get_local_addr();
+        send_data(int_bytes.clone(), addr);
+        
+        thread::sleep(time::Duration::from_millis(10));//at first was failing randomly, probably race condition with server thread
+        let request = RMIRequest::example();
+        let request_bytes = serde_cbor::to_vec(&request).expect("RMIRequest is serializable");
+        thread::sleep(time::Duration::from_millis(10));
+        send_data(request_bytes, addr);
+    }
+
+    #[test]
+    fn local_get() {
+        let num:i32 = 1234567890;
+        println!("data: {:?}",num);
+        let addr = get_local_addr();
+        let num_recv:i32 = receive_data(addr);
+        assert_eq!(num_recv,num);
+        let req = RMIRequest::example();
+        
+        let req_recv:RMIRequest = receive_data(addr);
+        assert_eq!(req_recv,req);
     }
 }

@@ -15,7 +15,7 @@ impl Skeleton{
         request: RMIRequest,
         object: &dyn RemoteObject,
     ) -> RMIResponse{
-        match object.run(&request.method_handler, request.serialized_args){
+        match object.run(&request.method_name, request.serialized_args){
             Ok(result) => RMIResponse::success(result),
             Err(e) => RMIResponse::error(format!("{e}")),
         }

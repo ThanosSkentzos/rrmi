@@ -116,7 +116,7 @@ impl TcpServer{
 #[cfg(test)]
 mod tests{
     use core::{panic, time};
-    use std::{fmt::Debug,thread};
+    use std::{fmt::Debug, net::{IpAddr, Ipv4Addr}, str::FromStr, thread};
     use serde::Deserialize;
 
     use super::*;
@@ -124,18 +124,35 @@ mod tests{
     fn get_local_addr()->SocketAddr{
         let hostname = "localhost";
         let ips: Vec<std::net::IpAddr> = dns_lookup::lookup_host(hostname).unwrap().collect();
-        println!("{hostname} ips: {:?}",ips);
-        let port = 1099;
+        println!("{hostname} ips: {ips:?}");
+        let port = 10999;
         SocketAddr::new(ips[0], port)// TODO for now use 1st entry
     }
-    fn get_server_ip(hostname:&str)->SocketAddr{
+    fn get_server_addr(hostname:&str)->SocketAddr{
         let ips: Vec<std::net::IpAddr> = dns_lookup::lookup_host(hostname).unwrap().collect();
-        println!("{hostname} ips: {:?}",ips);
-        if ips.len()==0{//TODO this should be error not panic
+        println!("{hostname} ips: {ips:?}");
+        if ips.len()==0{//fail test if not found
             panic!("unable to resolve hostname: {hostname}")
         }
-        let port = 1099;
-        SocketAddr::new(ips[0], port)// TODO for now use 1st entry
+        let port = 10999;
+        let mut ip:IpAddr = ips[0];
+        if ips.iter().any(|ip| ip.to_string().contains("127.0")){
+            ip = IpAddr::from(Ipv4Addr::from_str("0.0.0.0").expect("0.0.0.0 should pass"));
+            println!("{hostname} is this computer so using {ip:?}");
+        }
+        println!("using {}:{port} for {hostname}",ip);
+        SocketAddr::new(ip, port)
+    }
+    #[test]
+    fn liacs(){
+        let hostname = "0.0.0.0";
+        get_server_addr(hostname);
+        let hostname = "localhost";
+        get_server_addr(hostname);
+        let hostname = "0065074.student.liacs.nl";
+        get_server_addr(hostname);
+        let hostname = "0065073.student.liacs.nl";
+        get_server_addr(hostname);
     }
 
     fn send_data(data_serial:Vec<u8>,addr:SocketAddr){
@@ -168,18 +185,18 @@ mod tests{
 
     #[test]
     fn local_send() {
+        let addr = get_local_addr();
         let int:i32 = 1234567890;
         let int_bytes = serde_cbor::to_vec(&int).expect("int is serializable");
         println!("data: {:?}",int);
         println!("serialized: {:?}",int_bytes);
         thread::sleep(time::Duration::from_millis(10));//at first was failing randomly, probably race condition with server thread
-        let addr = get_local_addr();
+
         send_data(int_bytes.clone(), addr);
         
-        thread::sleep(time::Duration::from_millis(10));//at first was failing randomly, probably race condition with server thread
         let request = RMIRequest::example();
         let request_bytes = serde_cbor::to_vec(&request).expect("RMIRequest is serializable");
-        thread::sleep(time::Duration::from_millis(10));
+        thread::sleep(time::Duration::from_millis(10));//at first was failing randomly, probably race condition with server thread
         send_data(request_bytes, addr);
     }
 
@@ -190,9 +207,52 @@ mod tests{
         let addr = get_local_addr();
         let num_recv:i32 = receive_data(addr);
         assert_eq!(num_recv,num);
-        let req = RMIRequest::example();
         
+        let req = RMIRequest::example();
         let req_recv:RMIRequest = receive_data(addr);
         assert_eq!(req_recv,req);
     }
+
+    #[test]
+    fn remote_send_int() {
+        let addr = get_server_addr("0065074.student.liacs.nl");
+        let num:i32 = 1234567890;
+        let num_bytes = serde_cbor::to_vec(&num).expect("int is serializable");
+        println!("data: {:?}",num);
+        println!("serialized: {:?}",num_bytes);
+        
+        thread::sleep(time::Duration::from_millis(100));//at first was failing randomly, probably race condition with server thread
+        send_data(num_bytes.clone(), addr);
+    }
+
+    #[test]
+    fn remote_get_int() {
+        let addr = get_server_addr("0065074.student.liacs.nl");
+        let num:i32 = 1234567890;
+        let num_serial = serde_cbor::to_vec(&num).expect("int is serializable");
+        println!("data: {:?}",num);
+        println!("serialized: {:?}",num_serial);
+
+        let num_recv:i32 = receive_data(addr);
+        assert_eq!(num,num_recv);
+    }
+
+    #[test]
+    fn remote_send_request() {
+        let addr = get_server_addr("0065074.student.liacs.nl");
+        let data = RMIRequest::example();
+        let data_serial = serde_cbor::to_vec(&data).expect("RMIRequest is serializable");
+        
+        thread::sleep(time::Duration::from_millis(10));
+        send_data(data_serial, addr);
+    }
+
+    #[test]
+    fn remote_get_request() {
+        let addr = get_server_addr("0065074.student.liacs.nl");
+        let req = RMIRequest::example();
+        let req_recv: RMIRequest = receive_data(addr);
+        assert_eq!(req,req_recv)
+    }
+
 }

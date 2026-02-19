@@ -3,7 +3,7 @@ use thiserror::Error;
 
 use crate::registry::RMI_ID;
 
-#[derive(Error,Debug,Clone,Serialize,Deserialize)]
+#[derive(Error,Debug,Clone,Serialize,Deserialize,PartialEq)]
 pub enum RMIError {
 
     #[error("Serialization error: {0}")]

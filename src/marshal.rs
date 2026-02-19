@@ -2,7 +2,7 @@
 mod tests{
     use core::panic;
 
-    use crate::transport::RMIRequest;
+    use crate::{registry::RMI_ID, transport::RMIRequest};
     #[test]
     fn serde_int() {
         let data:i32 = 1;
@@ -17,7 +17,7 @@ mod tests{
 
     #[test]
     fn serde_RMIRequest() {
-        let object_id:u64 = 1;
+        let object_id:RMI_ID = 1;
         let method_handler:String = String::from("this is a test");
         let serialized_args = vec![0,1,2];
         let data = RMIRequest::new(object_id, method_handler, serialized_args);

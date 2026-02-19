@@ -1,14 +1,14 @@
 use serde::{Serialize,Deserialize};
-use crate::{error::RMIError, remote::RMIResult};
+use crate::{error::RMIError, registry::RMI_ID, remote::RMIResult};
 
 #[derive(Serialize,Deserialize,Debug,Clone,PartialEq)]
 pub struct RMIRequest{
-    pub object_id: u64,
+    pub object_id: RMI_ID,
     pub method_name: String,
     pub serialized_args: Vec<u8>,
 }
 impl RMIRequest{
-    pub fn new(object_id:u64,method_handler:String,serialized_args:Vec<u8>)->RMIRequest{
+    pub fn new(object_id:RMI_ID,method_handler:String,serialized_args:Vec<u8>)->RMIRequest{
         RMIRequest{object_id,method_name: method_handler,serialized_args}
     }
     

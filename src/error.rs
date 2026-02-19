@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::registry::RMI_ID;
+
 #[derive(Error,Debug,Clone,Serialize,Deserialize)]
 pub enum RMIError {
 
@@ -20,7 +22,13 @@ pub enum RMIError {
     BadArguments(String),
 
     #[error("Object not found with id: {0}")]
-    ObjectNotFound(u64),
+    ObjectNotFound(RMI_ID),
+
+    #[error("Object not found with name: {0}")]
+    NameNotFound(String),
+
+    #[error("Empty Registry")]
+    EmptyRegistry(),
 
     #[error("IO error: {0}")]
     IoError(String),

@@ -3,10 +3,9 @@ use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::Arc;
 
 use crate::transport::{RMIRequest, RMIResponse, Transport};
+use crate::remote::{Registry,RMIResult};
 use crate::error::RMIError;
-use crate::registry::{Registry};
-use crate::skeleton::{Skeleton};
-use crate::remote::{RMIResult};
+use crate::stub::Skeleton;
 
 
 pub struct TcpTransport{

@@ -1,7 +1,8 @@
-use std::net::SocketAddr;
-use crate::error::RMIError;
-use crate::registry::RMI_ID;
+pub mod registry;
+pub use registry::{RMI_ID,Registry};
 
+use crate::error::RMIError;
+use std::net::SocketAddr;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone,Serialize,Deserialize)]

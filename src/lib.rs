@@ -1,8 +1,9 @@
-mod transport;
 mod stub;
+
 mod remote;
+use remote::RMI_ID;
+
+mod transport;
+use transport::TcpTransport;
+
 mod error;
-mod tcp;
-mod skeleton;
-mod registry;
-mod marshal;

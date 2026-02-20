@@ -2,7 +2,7 @@
 mod tests{
     use core::panic;
 
-    use crate::{registry::RMI_ID, transport::RMIRequest};
+    use crate::{remote::RMI_ID, transport::RMIRequest};
     #[test]
     fn serde_int() {
         let data:i32 = 1;

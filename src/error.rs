@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::registry::RMI_ID;
+use crate::remote::RMI_ID;
 
 #[derive(Error,Debug,Clone,Serialize,Deserialize,PartialEq)]
 pub enum RMIError {

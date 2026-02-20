@@ -1,9 +1,10 @@
+pub type RMI_ID = u16;
+use crate::error::RMIError;
+use super::{RMIResult, RemoteObject, RemoteRef};
+
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
-use crate::error::RMIError;
-use crate::remote::{RMIResult, RemoteObject, RemoteRef};
-pub type RMI_ID = u16;
 
 pub struct Registry{// a hashmap with all objects
     port: u16,

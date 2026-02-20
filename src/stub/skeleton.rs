@@ -1,7 +1,6 @@
 use crate::remote::RemoteObject;
 use crate::transport::{RMIRequest, RMIResponse};
 
-
 pub struct Skeleton{
 }
 

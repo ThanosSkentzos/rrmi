@@ -39,15 +39,11 @@ impl RemoteTrait for Stub{
             method_name: "method_name".into(),
             serialized_args,
         };
-        let ip = Ipv4Addr::new(127, 0, 0, 1);//TODO local registry should give ip from remote object
-        let ip: IpAddr = IpAddr::V4(ip);
-        let port = 9999;
-        let server_addr = SocketAddr::new(ip, port);
+        let server_addr = self.remote.addr;
         let transport =TcpTransport::new(server_addr) ;
         let response = transport.send(req)?;
 
         let bytes:Vec<u8>= response.result?;
-        // map_err(|e| RMIError::ServerError(e.to_string()));
 
         let result: T = serde_cbor::from_slice(&bytes)
                                 .map_err(|e| RMIError::SerializationError(e.to_string()))?;

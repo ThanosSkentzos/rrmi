@@ -127,6 +127,7 @@ mod tests{
         let port = 10999;
         SocketAddr::new(ips[0], port)// TODO for now use 1st entry
     }
+
     fn get_server_addr(hostname:&str)->SocketAddr{
         let ips: Vec<std::net::IpAddr> = dns_lookup::lookup_host(hostname).unwrap().collect();
         println!("{hostname} ips: {ips:?}");
@@ -142,8 +143,9 @@ mod tests{
         println!("using {}:{port} for {hostname}",ip);
         SocketAddr::new(ip, port)
     }
+
     #[test]
-    fn liacs(){
+    fn liacs_ips(){
         let hostname = "0.0.0.0";
         get_server_addr(hostname);
         let hostname = "localhost";

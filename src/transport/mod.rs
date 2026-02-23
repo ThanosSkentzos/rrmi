@@ -7,15 +7,17 @@ use crate::RMI_ID;
 #[derive(Serialize,Deserialize,Debug,Clone,PartialEq)]
 pub struct RMIRequest{
     pub object_id: RMI_ID,
-    pub method_name: String,
+    pub method_name: String,//TODO switch to enum
     pub serialized_args: Vec<u8>,
 }
 impl RMIRequest{
     pub fn new(object_id:RMI_ID,method_handler:String,serialized_args:Vec<u8>)->RMIRequest{
         RMIRequest{object_id,method_name: method_handler,serialized_args}
     }
-    
-    pub fn example()->RMIRequest{
+}
+
+impl Default for RMIRequest{ 
+    fn default()->RMIRequest{
         RMIRequest{object_id:42,method_name: "test".into(),serialized_args:vec![0,1,2]}
     }
 }

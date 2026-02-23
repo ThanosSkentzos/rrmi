@@ -112,6 +112,7 @@ pub fn getRegistry(hostname:&str, port:u16) -> Registry{
 
 #[cfg(test)]
 mod tests{
+    use super::*;
     use core::time;
     use super::*;
     use local_ip_address::local_ip;
@@ -172,7 +173,11 @@ mod tests{
 
         std::thread::sleep(time::Duration::from_millis(100));
         let names = reg.lock().unwrap().list();
-         
-        assert_eq!(names.err(), Option::Some(RMIError::EmptyRegistry()));
+
+        match names {
+            Result::Err(RMIError::EmptyRegistry()) => (),
+            _ => panic!(),
+        }
+        // assert_eq!(names.err(), Option::Some(RMIError::EmptyRegistry()));
     }
 }

@@ -195,7 +195,7 @@ mod tests{
 
         send_data(int_bytes.clone(), addr);
         
-        let request = RMIRequest::example();
+        let request = RMIRequest::default();
         let request_bytes = serde_cbor::to_vec(&request).expect("RMIRequest is serializable");
         thread::sleep(time::Duration::from_millis(10));//at first was failing randomly, probably race condition with server thread
         send_data(request_bytes, addr);
@@ -209,7 +209,7 @@ mod tests{
         let num_recv:i32 = receive_data(addr);
         assert_eq!(num_recv,num);
         
-        let req = RMIRequest::example();
+        let req = RMIRequest::default();
         let req_recv:RMIRequest = receive_data(addr);
         assert_eq!(req_recv,req);
     }
@@ -241,7 +241,7 @@ mod tests{
     #[test]
     fn remote_send_request() {
         let addr = get_server_addr("0065074.student.liacs.nl");
-        let data = RMIRequest::example();
+        let data = RMIRequest::default();
         let data_serial = serde_cbor::to_vec(&data).expect("RMIRequest is serializable");
         
         thread::sleep(time::Duration::from_millis(10));
@@ -251,7 +251,7 @@ mod tests{
     #[test]
     fn remote_get_request() {
         let addr = get_server_addr("0065074.student.liacs.nl");
-        let req = RMIRequest::example();
+        let req = RMIRequest::default();
         let req_recv: RMIRequest = receive_data(addr);
         assert_eq!(req,req_recv)
     }

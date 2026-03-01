@@ -7,10 +7,10 @@ mod tests{
     fn serde_int() {
         let data:i32 = 1;
         let data_serial = serde_cbor::to_vec(&data).expect("int is serializable");
-        println!("data: {:?}",data);
-        println!("serialized: {:?}",data_serial);
+        eprintln!("data: {:?}",data);
+        eprintln!("serialized: {:?}",data_serial);
         let result:i32 = serde_cbor::from_slice(&data_serial).expect("should be able to deserialize");
-        println!("deserialized: {:?}",result);
+        eprintln!("deserialized: {:?}",result);
 
         assert_eq!(data,result);
     }
@@ -22,10 +22,10 @@ mod tests{
         let serialized_args = vec![0,1,2];
         let data = RMIRequest::new(object_id, method_handler, serialized_args);
         let data_serial = serde_cbor::to_vec(&data).expect("int is serializable");
-        println!("data : {:?}",data);
-        // println!("serialized: {:?}",data_serial);
+        eprintln!("data : {:?}",data);
+        // eprintln!("serialized: {:?}",data_serial);
         let result:RMIRequest = serde_cbor::from_slice(&data_serial).expect("should be able to deserialize");
-        println!("after: {:?}",result);
+        eprintln!("after: {:?}",result);
         assert_eq!(data,result);
     }
     #[test]
@@ -45,6 +45,6 @@ mod tests{
          assert_eq!(method_handler,method_handler_d);
          assert_eq!(arr,arr_d);
          assert_eq!(hostname,hostname_d);
-         println!("{object_id_d},{method_handler_d},{arr_d:?},{hostname_d}")
+         eprintln!("{object_id_d},{method_handler_d},{arr_d:?},{hostname_d}")
     }
 }

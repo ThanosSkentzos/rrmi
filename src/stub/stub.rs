@@ -1,6 +1,8 @@
 use std::any::type_name_of_val;
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize,Serialize};
 
@@ -16,7 +18,7 @@ pub trait RemoteTrait: Send + Sync{
 pub trait RemoteTraitTest: Send + Sync{
     fn run_stub_test<T: for<'de> Deserialize<'de>+ Default,A:Serialize+Debug>(&self, arg: A) -> RMIResult<T>;
 }
-
+#[derive(Debug)]
 pub struct Stub{
     remote: RemoteRef,
 }
@@ -47,6 +49,7 @@ impl RemoteTrait for Stub{
             method_name: "method_name".into(),
             serialized_args,
         };
+        eprintln!("req: {req:?}");
         let server_addr = self.remote.addr;
         let transport =TcpTransport::new(server_addr) ;
         let response = transport.send(req)?;
@@ -55,7 +58,7 @@ impl RemoteTrait for Stub{
 
         
         let tuple: R = serde_cbor::from_slice(&bytes)
-                                .map_err(|e| RMIError::SerializationError(e.to_string()))?;
+                                .map_err(|e| RMIError::DeserializationError(e.to_string()))?;
         Ok(tuple)
     }
 }
@@ -65,7 +68,7 @@ impl RemoteTraitTest for Stub{
         let t = type_name_of_val(&arg);
         let ret = R::default();
         let t_ret = type_name_of_val(&ret);
-        println!("args: {arg:?} of type: {t:?} -> return {t_ret:?}");
+        eprintln!("args: {arg:?} of type: {t:?} -> return {t_ret:?}");
         RMIResult::Ok(ret)
     }
 }

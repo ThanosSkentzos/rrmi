@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-
+use std::backtrace::{self, Backtrace};
 use crate::remote::RMI_ID;
 
 #[derive(Error,Debug,Clone,Serialize,Deserialize,PartialEq)]
@@ -8,6 +8,9 @@ pub enum RMIError {
 
     #[error("Serialization error: {0}")]
     SerializationError(String),
+
+    #[error("Deserialization error: {0}")]
+    DeserializationError(String),
 
     #[error("Server error: {0}")]
     ServerError(String),

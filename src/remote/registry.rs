@@ -3,8 +3,11 @@ use crate::error::RMIError;
 use super::{RMIResult, RemoteObject, RemoteRef};
 
 use std::collections::HashMap;
-use std::net::SocketAddr;
+use std::io::{Read, Write};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
+use std::str::FromStr;
 use std::sync::{Arc, Mutex};
+use serde::{Deserialize, Serialize};
 
 pub struct Registry{// a hashmap with all objects
     port: u16,
@@ -23,29 +26,26 @@ impl Registry{
         }
     }
 
+    pub fn with_port(self,port:u16)-> Registry{
+        Registry { port, ..self}
+    }
+
     fn get_addr(&self)-> SocketAddr{
         // this will be slower than just saving it
         let ip = local_ip_address::local_ip().expect("Should be able to get local ip");
         SocketAddr::new(ip, self.port)
     }
 
-    pub fn register(&self,name:String,object: Arc<dyn RemoteObject>) -> RMI_ID{
-        let mut next_id = self.next_id.lock().unwrap();
-        let id = *next_id;
-        *next_id +=1;
-        self.objects.lock().unwrap().insert(id, object);
-        self.names.lock().unwrap().insert(name, id);
-        id
-    }
 
-    pub fn deregister(&self, name:String) -> RMIResult<()>{
+    pub fn remove(&self, name:&str) -> RMIResult<()>{
         let mut names = self.names.lock().unwrap();
-        let id = names.get(&name).cloned().ok_or(RMIError::NameNotFound(name.clone()))?;
-        names.remove(&name);
+        let id = names.get(name).cloned().ok_or(RMIError::NameNotFound(name.to_string()))?;
+        names.remove(name);
 
         let mut objects = self.objects.lock().unwrap();
         objects.remove(&id)
             .ok_or(RMIError::ObjectNotFound(id))?;
+        todo!("make sure the object is also droped");
         Ok(())
     }
 
@@ -60,11 +60,12 @@ impl Registry{
     pub fn lookup(&self,name:&str) -> RMIResult<RemoteRef>{
         // ask for remote ref according to name
         let names = self.names.lock().unwrap();
-        names.get(name)
+        let remote_ref= names.get(name)
             .ok_or(RMIError::NameNotFound(name.to_string()))
-            .map(|&id| RemoteRef { addr: self.get_addr(), id })
+            .map(|&id| RemoteRef { addr: self.get_addr(), id });
+        todo!("also add a new port for each new client looking for this");
+        remote_ref
     }
-
 
     pub fn list(&self) -> RMIResult<Vec<String>>{
         let names: Vec<String> = self.names.lock().unwrap().keys().cloned().collect();
@@ -74,10 +75,51 @@ impl Registry{
         }
     }
 
-    pub fn bind(&self){
-        todo!()
-        // try TcpListener at 0.0.0.0:port otherwise error
-        // spawn some workers to catch requests and run handle_request
+    pub fn bind(&self,name:&str,object: Arc<dyn RemoteObject>) -> RMI_ID{
+        let mut next_id = self.next_id.lock().unwrap();
+        let id = *next_id;
+        *next_id +=1;
+        self.objects.lock().unwrap().insert(id, object);
+        self.names.lock().unwrap().insert(name.to_string(), id);
+        eprintln!("Registered {id}: {name}");
+        // todo!("bind a socket for the object for each client");
+        let socket = SocketAddr::new(
+            IpAddr::V4(Ipv4Addr::from_str("0.0.0.0").expect("0.0.0.0 should pass")),
+            40000);
+        let listener = TcpListener::bind(socket).unwrap();//todo handle error by retrying
+
+        std::thread::spawn(move ||{
+            for stream in listener.incoming(){
+                match stream{
+                    Ok(stream)=> todo!("should be skeleton here to handle"),
+                    Err(e) => eprintln!("Transport error: {e}")
+                }
+            }
+        });
+        id
+    }
+    pub fn listen(self: &Arc<Self>) -> RMIResult<()>{
+        let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::from_str("0.0.0.0").expect("0.0.0.0 should pass")),self.port);
+        let listener = TcpListener::bind(socket)
+            .map_err(|e| RMIError::TransportError(e.to_string()))?;
+        eprintln!("RMI Registry listening on {}", socket);
+
+        let self_clone = Arc::clone(&self);
+        std::thread::spawn(move||{
+            // bind separate port for each remote object + client (1 per client)
+            for stream in listener.incoming(){
+                match stream{
+                    Ok(stream) => {
+                        if let Err(e) = self_clone.handle_connection(stream){
+                            eprintln!("Error: {e} when handling connection");
+                        }
+                    }
+                    Err(e) => eprintln!("Transport error: {e}"),
+                };
+            }
+        });
+        Ok(())
+
         // check variable to unbind
         // gracefull shutdown or kill?
     }
@@ -87,7 +129,33 @@ impl Registry{
         // switch variable to unbind
     }
 
-    pub fn handle_request(&mut self, req: RegistryRequest) -> RegistryResponse{
+    fn handle_connection(&self, mut stream:TcpStream)-> RMIResult<()>{
+        let mut len_bytes = [0u8; 4];
+        let _ = stream.read_exact(&mut len_bytes)
+            .map_err(|e| RMIError::TransportError(e.to_string()))?;
+        
+        let len = u32::from_be_bytes(len_bytes) as usize;
+        let mut request_bytes = vec![0u8;len];
+        stream.read_exact(&mut request_bytes)
+            .map_err(|e| RMIError::TransportError(e.to_string()))?;
+
+        let request: RegistryRequest = serde_cbor::from_slice(&request_bytes)
+            .map_err(|e| RMIError::DeserializationError(e.to_string()))?;
+        let response = self.handle_request(request);
+
+        let response_bytes = serde_cbor::to_vec(&response)
+            .map_err(|e| RMIError::SerializationError(e.to_string()))?;
+        let len = response_bytes.len() as u32;
+
+        stream.write_all(&len.to_be_bytes()).map_err(|e| RMIError::TransportError(e.to_string()))?;
+        stream.write_all(&response_bytes).map_err(|e| RMIError::TransportError(e.to_string()))?;
+        stream.flush().map_err(|e| RMIError::TransportError(e.to_string()))?;
+
+        eprintln!("Response sent.");
+        Ok(())
+    }
+
+    fn handle_request(&self, req: RegistryRequest) -> RegistryResponse{
         match req{
            RegistryRequest::Lookup { name } => RegistryResponse::Lookup(self.lookup(&name)),
            RegistryRequest::List => RegistryResponse::List(self.list())
@@ -95,11 +163,13 @@ impl Registry{
     }
 }
 
+#[derive(Serialize,Deserialize)]
 pub enum RegistryRequest{
     Lookup {name: String},
     List,
 }
 
+#[derive(Serialize,Deserialize)]
 pub enum RegistryResponse{
     Lookup(RMIResult<RemoteRef>),
     List(RMIResult<Vec<String>>),
@@ -112,11 +182,12 @@ pub fn getRegistry(hostname:&str, port:u16) -> Registry{
 
 #[cfg(test)]
 mod tests{
+    use crate::{remote::MockRemoteObject, stub::{Stub,RemoteTrait}};
     use super::*;
-    use core::time;
-    use super::*;
+    use core::{panic, time};
     use local_ip_address::local_ip;
     use threadpool::ThreadPool;
+
     #[test]
     fn addr(){
         let reg = Registry::new();
@@ -127,16 +198,10 @@ mod tests{
     }
 
 
-    struct TestObject{}
-    impl RemoteObject for TestObject{
-        fn run(&self, method_name: &str, args: Vec<u8>) -> RMIResult<Vec<u8>> {
-            RMIResult::Ok(Vec::new())
-        }
-    }
     #[test]
     fn populate_clear(){
         let reg = Arc::new(Mutex::new(Registry::new()));
-        let pool = ThreadPool::new(4);
+        let pool = ThreadPool::new(2);
         let jobs = 10;
         let per_thread = 42;
 
@@ -145,17 +210,18 @@ mod tests{
             let r = Arc::clone(&reg);
             pool.execute( move || {
                 for n in 0..per_thread{
-                let object = Arc::new(TestObject{});
+                let object = Arc::new(MockRemoteObject::silent());
                 let name = format!("{thread}-{n}");
                 let guard = r.lock().unwrap();
-                guard.register(name, object);
+                guard.bind(&name, object);
                 drop(guard);
                 }
             } );
         }
+        
         std::thread::sleep(time::Duration::from_millis(100));
         let num_objects = reg.lock().unwrap().list().unwrap().len();
-        println!("Num objects after populating {}",num_objects);
+        eprintln!("Num objects after populating {}",num_objects);
         assert_eq!(num_objects, jobs*per_thread);
 
         // DEREGISTER PHASE
@@ -165,7 +231,7 @@ mod tests{
                 for n in 0..per_thread{
                 let guard = r.lock().unwrap();
                 let name = format!("{thread}-{n}");
-                guard.deregister(name).expect("should still have this process");
+                guard.remove(&name).expect("should still have this process");
                 drop(guard);
                 }
             } );
@@ -179,5 +245,59 @@ mod tests{
             _ => panic!(),
         }
         // assert_eq!(names.err(), Option::Some(RMIError::EmptyRegistry()));
+    }
+
+    #[test]
+    fn list_bind_remove(){
+
+        let mut reg = Registry::new().with_port(1099);
+        let reg = Arc::new(reg);
+        reg.listen();
+        let verbose = Arc::new(MockRemoteObject::verbose());
+        let silent = Arc::new(MockRemoteObject::silent());
+        reg.bind("verbose", verbose);
+        reg.bind("silent", silent);
+
+        let remote = reg.lookup("silent").expect("silent should be in");
+        eprintln!("{remote:?}") ;
+        let remote = reg.lookup("verbose").expect("verbose should be in");
+        eprintln!("{remote:?}") ;
+
+        let l = reg.list().expect("two already in");
+        eprintln!("{:?}",l);
+        reg.remove("verbose").expect("still in");
+
+        let l = reg.list().expect("one still in");
+        eprintln!("{:?}",l);
+        reg.remove("silent").expect("still in");
+
+        match reg.list(){
+            Ok(_)=> panic!("should not have any other objects"),
+            Err(RMIError::EmptyRegistry())=> (),
+            Err(_)=> panic!("should return EmptyRegistry error")
+        };
+
+    }
+    #[test]
+    fn local_listen(){
+
+        let reg = Registry::new().with_port(1099);
+        let reg = Arc::new(reg);
+        let _ = reg.listen();
+
+        let obj_verbose = Arc::new(MockRemoteObject::verbose());
+        let result_expected = obj_verbose.run("method_name", vec![42]).expect("Mock object returns the args");
+        reg.bind("verbose", obj_verbose);
+
+        let rmt= reg.lookup("verbose").expect("verbose should be in");
+        let stb= Stub::new(rmt);
+        eprintln!("stub: {stb:?}");
+
+        //NEED TO KNOW THE RETURN TYPE
+        let res:RMIResult<Vec<u8>> = stb.run_stub(vec![42]);
+        eprintln!("result: {res:?}")
+
+
+
     }
 }

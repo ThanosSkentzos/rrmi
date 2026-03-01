@@ -23,27 +23,34 @@ impl Transport for TcpTransport{
         // serialize request
         // tcpstream first send byte length then bytes
         // get response
+        eprintln!("tcp connecting...");
         let mut stream = TcpStream::connect(self.server_addr)
             .map_err(|e| RMIError::TransportError(e.to_string()))?;
 
+        eprintln!("tcp serializing...");
         let request_serialized = serde_cbor::to_vec(&req)
             .map_err(|e| RMIError::SerializationError(e.to_string()))?;
-
         let len = request_serialized.len() as u32;
+
+        eprintln!("tcp sending {len} bytes...");
         let _ = stream.write_all(&len.to_be_bytes()).map_err(|e| RMIError::TransportError(e.to_string()))?;
         let _ = stream.write_all(&request_serialized).map_err(|e| RMIError::TransportError(e.to_string()))?;
         let _ = stream.flush().map_err(|e| RMIError::TransportError(e.to_string()))?;
 
+        eprintln!("tcp reading response len...");
         // how many bytes are we getting back?
         let mut len_response_bytes = [0u8;4];
         let _ = stream.read_exact(&mut len_response_bytes);
         let response_len = u32::from_be_bytes(len_response_bytes) as usize;
 
+        eprintln!("tcp reading response {response_len:?} bytes...");
         let mut response_bytes = vec![0u8;response_len];       
         let _ = stream.read_exact(&mut response_bytes);
 
+        eprintln!("tcp deserializing...");
         let response: RMIResponse = serde_cbor::from_slice(&response_bytes)
-                                .map_err(|e| RMIError::SerializationError(e.to_string()))?;
+                                .map_err(|e| RMIError::DeserializationError(e.to_string()))?;
+        eprintln!("tcp deserializing...");
         Ok(response)
     }
 }
@@ -65,12 +72,12 @@ impl TcpServer{
     pub fn bind(&self, addr: SocketAddr) -> RMIResult<()>{
         let listener = TcpListener::bind(addr)
             .map_err(|e| RMIError::TransportError(e.to_string()))?;
-        println!("RMI Server listening on {}", addr);
+        eprintln!("RMI Server listening on {}", addr);
         for stream in listener.incoming(){
             match stream{
                 Ok(stream) => {
                     let client_addr = stream.peer_addr().unwrap_or_else(|_|{"unknown".parse().unwrap()});
-                    println!("New connection from {}", client_addr);
+                    eprintln!("New connection from {}", client_addr);
 
                     if let Err(e) = &self.handle_connection(stream){
                         eprintln!("Error handling connection from {}: {}", client_addr, e);
@@ -92,8 +99,8 @@ impl TcpServer{
         let mut request_bytes = vec![0u8; len]; // same thing as when client gets RMIResponse
         let _ = stream.read_exact(&mut request_bytes);
         let request: RMIRequest = serde_cbor::from_slice(&request_bytes)
-                        .map_err(|e| RMIError::SerializationError(e.to_string()))?;
-        println!("Received request for object_id= {}, method= {}",request.object_id,request.method_name);
+                        .map_err(|e| RMIError::DeserializationError(e.to_string()))?;
+        eprintln!("Received request for object_id= {}, method= {}",request.object_id,request.method_name);
 
         let object = self.registry.get(request.object_id)?;
         let response = self.skeleton.handle_request(request, object.as_ref());
@@ -106,7 +113,7 @@ impl TcpServer{
         stream.write_all(&response_bytes).map_err(|e| RMIError::TransportError(e.to_string()))?;
         stream.flush().map_err(|e| RMIError::TransportError(e.to_string()))?;//same thing as when client sends RMIRequest
 
-        println!("Response sent.");
+        eprintln!("Response sent.");
         Ok(())
     }
 }
@@ -123,14 +130,14 @@ mod tests{
     fn get_local_addr()->SocketAddr{
         let hostname = "localhost";
         let ips: Vec<std::net::IpAddr> = dns_lookup::lookup_host(hostname).unwrap().collect();
-        println!("{hostname} ips: {ips:?}");
+        eprintln!("{hostname} ips: {ips:?}");
         let port = 10999;
         SocketAddr::new(ips[0], port)// TODO for now use 1st entry
     }
 
     fn get_server_addr(hostname:&str)->SocketAddr{
         let ips: Vec<std::net::IpAddr> = dns_lookup::lookup_host(hostname).unwrap().collect();
-        println!("{hostname} ips: {ips:?}");
+        eprintln!("{hostname} ips: {ips:?}");
         if ips.len()==0{//fail test if not found
             panic!("unable to resolve hostname: {hostname}")
         }
@@ -138,9 +145,9 @@ mod tests{
         let mut ip:IpAddr = ips[0];
         if ips.iter().any(|ip| ip.to_string().contains("127.0")){
             ip = IpAddr::from(Ipv4Addr::from_str("0.0.0.0").expect("0.0.0.0 should pass"));
-            println!("{hostname} is this computer so using {ip:?}");
+            eprintln!("{hostname} is this computer so using {ip:?}");
         }
-        println!("using {}:{port} for {hostname}",ip);
+        eprintln!("using {}:{port} for {hostname}",ip);
         SocketAddr::new(ip, port)
     }
 
@@ -157,7 +164,7 @@ mod tests{
     }
 
     fn send_data(data_serial:Vec<u8>,addr:SocketAddr){
-        println!("Client sending to {addr}");
+        eprintln!("Client sending to {addr}");
         let mut stream = TcpStream::connect(addr.to_string()).expect("client stream should be able to connect");
         let len = data_serial.len() as u32;
         let _ = stream.write_all(&len.to_be_bytes()).expect("should be able to write len");
@@ -167,7 +174,7 @@ mod tests{
 
     fn receive_data<T: for<'de> Deserialize<'de> + Debug + PartialEq>(addr:SocketAddr) -> T{
         let listener = TcpListener::bind(addr.to_string()).expect("port should be available");
-        println!("Server listening on {addr}");
+        eprintln!("Server listening on {addr}");
         let stream = listener.accept();
         match stream {
             Ok((mut stream,_addr))=>{
@@ -177,7 +184,7 @@ mod tests{
                 let mut request_bytes = vec![0u8; len]; // same thing as when client gets RMIResponse
                 let _ = stream.read_exact(&mut request_bytes);
                 let data_recv: T = serde_cbor::from_slice(&request_bytes).expect("type should be deserializable");
-                println!("Server received data {:?}",data_recv);
+                eprintln!("Server received data {:?}",data_recv);
                 data_recv 
             },
             Err(e) => panic!("Error accepting connection: {}",e)
@@ -189,8 +196,8 @@ mod tests{
         let addr = get_local_addr();
         let int:i32 = 1234567890;
         let int_bytes = serde_cbor::to_vec(&int).expect("int is serializable");
-        println!("data: {:?}",int);
-        println!("serialized: {:?}",int_bytes);
+        eprintln!("data: {:?}",int);
+        eprintln!("serialized: {:?}",int_bytes);
         thread::sleep(time::Duration::from_millis(10));//at first was failing randomly, probably race condition with server thread
 
         send_data(int_bytes.clone(), addr);
@@ -204,7 +211,7 @@ mod tests{
     #[test]
     fn local_get() {
         let num:i32 = 1234567890;
-        println!("data: {:?}",num);
+        eprintln!("data: {:?}",num);
         let addr = get_local_addr();
         let num_recv:i32 = receive_data(addr);
         assert_eq!(num_recv,num);
@@ -219,8 +226,8 @@ mod tests{
         let addr = get_server_addr("0065074.student.liacs.nl");
         let num:i32 = 1234567890;
         let num_bytes = serde_cbor::to_vec(&num).expect("int is serializable");
-        println!("data: {:?}",num);
-        println!("serialized: {:?}",num_bytes);
+        eprintln!("data: {:?}",num);
+        eprintln!("serialized: {:?}",num_bytes);
         
         thread::sleep(time::Duration::from_millis(100));//at first was failing randomly, probably race condition with server thread
         send_data(num_bytes.clone(), addr);
@@ -231,8 +238,8 @@ mod tests{
         let addr = get_server_addr("0065074.student.liacs.nl");
         let num:i32 = 1234567890;
         let num_serial = serde_cbor::to_vec(&num).expect("int is serializable");
-        println!("data: {:?}",num);
-        println!("serialized: {:?}",num_serial);
+        eprintln!("data: {:?}",num);
+        eprintln!("serialized: {:?}",num_serial);
 
         let num_recv:i32 = receive_data(addr);
         assert_eq!(num,num_recv);

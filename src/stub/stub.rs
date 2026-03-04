@@ -1,13 +1,10 @@
 use std::any::type_name_of_val;
-use std::collections::HashMap;
 use std::fmt::Debug;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize,Serialize};
 
 use crate::remote::{RemoteRef,RMIResult};
-use crate::TcpTransport;
+use crate::TcpClient;
 use crate::transport::{RMIRequest, Transport};
 use crate::error::RMIError;
 
@@ -40,7 +37,6 @@ impl RemoteTrait for Stub{
         // use transport to send and get response
         // unmasrhal result & return
 
-
         let serialized_args = serde_cbor::to_vec(&arg)
                             .map_err(|e| RMIError::SerializationError(e.to_string()))?;
 
@@ -51,7 +47,7 @@ impl RemoteTrait for Stub{
         };
         eprintln!("req: {req:?}");
         let server_addr = self.remote.addr;
-        let transport =TcpTransport::new(server_addr) ;
+        let transport =TcpClient::new(server_addr) ;
         let response = transport.send(req)?;
 
         let bytes:Vec<u8>= response.result?;

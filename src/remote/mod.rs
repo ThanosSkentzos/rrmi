@@ -40,7 +40,7 @@ impl MockRemoteObject{
 }
 impl RemoteObject for MockRemoteObject{
     fn run(&self, method_name: &str, args: Vec<u8>) -> RMIResult<Vec<u8>> {
-        if self.verbose {eprintln!("got {method_name} and {args:?}");}
+        if self.verbose {eprintln!("Remote got {method_name} and {args:?}");}
         RMIResult::Ok(args)
     }
 }

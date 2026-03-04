@@ -1,5 +1,6 @@
 mod tcp;
-pub use tcp::TcpTransport;
+pub mod utils;
+pub use tcp::TcpClient;
 use serde::{Serialize,Deserialize};
 use crate::{error::RMIError, remote::RMIResult};
 use crate::RMI_ID;

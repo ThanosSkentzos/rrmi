@@ -5,6 +5,6 @@ use remote::RMI_ID;
 pub use remote::Registry;
 
 mod transport;
-use transport::TcpTransport;
+use transport::TcpClient;
 
 mod error;

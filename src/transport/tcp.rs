@@ -2,6 +2,8 @@ use std::io::{Read, Write};
 pub use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 use std::sync::Arc;
 
+use serde::{Deserialize, Serialize};
+
 use crate::error::RMIError;
 use crate::remote::{RMIResult, Registry};
 use crate::transport::{RMIRequest, RMIResponse, Transport};
@@ -16,7 +18,7 @@ impl TcpClient {
     }
 }
 impl Transport for TcpClient {
-    fn send(&self, req: RMIRequest) -> RMIResult<RMIResponse> {
+    fn send<REQ:Serialize+ for<'de> Deserialize<'de>, RES:Serialize+for<'de> Deserialize<'de>>(&self, req: REQ) -> RMIResult<RES> {
         // connect to server
         // serialize request
         // tcpstream first send byte length then bytes
@@ -52,8 +54,8 @@ impl Transport for TcpClient {
         let _ = stream.read_exact(&mut response_bytes);
 
         // eprintln!("tcp deserializing...");
-        let response: RMIResponse = serde_cbor::from_slice(&response_bytes)
-            .map_err(|e| RMIError::DeserializationError(e.to_string()))?;
+        let response: RES = serde_cbor::from_slice(&response_bytes)
+            .map_err(|e| RMIError::DeserializationError(e.to_string())).expect("should deserialize");
         // eprintln!("tcp deserializing...");
         Ok(response)
     }

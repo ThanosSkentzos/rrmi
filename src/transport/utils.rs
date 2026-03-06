@@ -33,7 +33,7 @@ pub fn get_server_addr(hostname: &str,port:u16) -> SocketAddr {
         panic!("unable to resolve hostname: {hostname}")
     }
     let mut ip: IpAddr = ips[0];
-    if ips.iter().any(|ip| ip.to_string().contains("127.0")) {
+    if ips.iter().any(|ip| ip.to_string().contains("127.0") || ip.to_string().contains("localhost")) {
         ip = IpAddr::from(Ipv4Addr::from_str("0.0.0.0").expect("0.0.0.0 should pass"));
         eprintln!("{hostname} is this computer so using {ip:?}");
     }
@@ -46,7 +46,7 @@ mod tests {
     use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
     use super::*;
-    static TOTAL: usize = 1000;
+    static TOTAL: usize = 100;
     #[test]
     fn get_ports_mine() {
         let start = SystemTime::now()

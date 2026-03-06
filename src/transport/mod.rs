@@ -48,5 +48,5 @@ impl RMIResponse {
 }
 
 pub trait Transport: Send + Sync {
-    fn send(&self, req: RMIRequest) -> RMIResult<RMIResponse>;
+    fn send<REQ:Serialize + for<'de> Deserialize<'de>, RES: Serialize + for<'de>Deserialize<'de>>(&self, req: REQ) -> RMIResult<RES>;
 }

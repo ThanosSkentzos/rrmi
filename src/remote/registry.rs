@@ -1,9 +1,9 @@
 pub type RMI_ID = usize;
 use super::{RMIResult, RemoteObject, RemoteRef};
 use crate::error::RMIError;
-use crate::stub::{Skeleton, Stub};
-use crate::transport::utils;
+use crate::stub::Skeleton;
 use crate::transport::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
+use crate::transport::{TcpClient, Transport, utils};
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -87,7 +87,7 @@ impl Registry {
     fn lookup_log(&self, name: &str) -> RMIResult<RemoteRef> {
         let res = self.lookup(name);
         match res.clone() {
-            Ok(rref) => eprintln!("Skeleton listening at {:?}", rref.addr),
+            Ok(rref) => eprintln!("Registry sees skeleton listening at {:?}", rref.addr),
             Err(_) => (),
         }
         res
@@ -193,11 +193,51 @@ pub fn create_registry(port: u16) -> Arc<Registry> {
     reg
 }
 
-pub fn find_registry(host: String, port: u16) -> Stub {
-    // todo!("to do this I need to ask the registry for its reference and treat it like a skeleton")
+pub struct RegistryStub {
+    remote: RemoteRef,
+}
+impl RegistryStub {
+    pub fn new(remote: RemoteRef) -> Self {
+        RegistryStub { remote }
+    }
+
+    pub fn lookup(&self, name: &str) -> RMIResult<RemoteRef> {
+        let transport = TcpClient::new(self.remote.addr);
+        let req = RegistryRequest::Lookup {
+            name: name.to_string(),
+        };
+        let resp: RegistryResponse = transport.send(req)?;
+        match resp{
+            RegistryResponse::Lookup(res)=> res,
+            _ => Err(RMIError::TransportError("Wrong response".to_string())),
+        }
+    }
+
+    fn lookup_log(&self, name: &str) -> RMIResult<RemoteRef> {
+        let res = self.lookup(name);
+        match res.clone() {
+            Ok(rref) => eprintln!("RegistryStub sees skeleton listening at {:?}", rref.addr),
+            Err(_) => (),
+        }
+        res
+    }
+
+    pub fn list(&self) -> RMIResult<Vec<String>> {
+        let transport = TcpClient::new(self.remote.addr);
+        let req = RegistryRequest::List {};
+        let resp: RegistryResponse = transport.send(req)?;
+        match resp{
+            RegistryResponse::List(res)=> res,
+            _ => Err(RMIError::TransportError("Wrong response".to_string())),
+        }
+    }
+}
+
+pub fn get_registry(host: &str, port: u16) -> RegistryStub {
     let addr = utils::get_server_addr(&host, port);
     let remote_ref_ref = RemoteRef::new(addr, 0);
-    Stub::new(remote_ref_ref)
+    RegistryStub::new(remote_ref_ref)
+    // todo!("to do this I need to ask the registry for its reference and treat it like a skeleton")
 }
 
 #[derive(Serialize, Deserialize)]
@@ -210,11 +250,6 @@ pub enum RegistryRequest {
 pub enum RegistryResponse {
     Lookup(RMIResult<RemoteRef>),
     List(RMIResult<Vec<String>>),
-}
-
-pub fn get_registry(hostname: &str, port: u16) -> Registry {
-    todo!("") // connect to host and port and get remote reference to registry
-    // registry = Registry.from(registry.getRegistry("00650072.students.licas.nl",1099))
 }
 
 #[cfg(test)]
@@ -241,7 +276,8 @@ mod tests {
 
     #[test]
     fn populate_clear() {
-        let reg = Arc::new(Mutex::new(Registry::default()));
+        let reg = create_registry(1097);
+        let reg = Arc::new(Mutex::new(reg));
         let pool = ThreadPool::new(2);
         let jobs = 10;
         let per_thread = 42;
@@ -289,8 +325,9 @@ mod tests {
 
     #[test]
     fn bind_lookup_list_remove() {
-        let reg = Registry::default();
-        let reg = reg.listen().expect("Registry should be able to listen");
+        let reg = create_registry(1099);
+        let rmt_reg = get_registry("localhost", 1099);
+
         let verbose = MockRemoteObject::verbose();
         let silent = MockRemoteObject::silent();
         reg.bind("verbose", verbose);
@@ -300,11 +337,13 @@ mod tests {
         let remote = reg.lookup_log("verbose").expect("verbose should be in");
 
         let l = reg.list().expect("two already in");
-        eprintln!("{:?}", l);
+        let l_rmt = rmt_reg.list().expect("same");
+        eprintln!("local: {:?} vs remote: {:?}", l,l_rmt);
         reg.remove_log("verbose").expect("still in");
 
         let l = reg.list().expect("one still in");
-        eprintln!("{:?}", l);
+        let l_rmt = rmt_reg.list().expect("same");
+        eprintln!("local: {:?} vs remote: {:?}", l,l_rmt);
         reg.remove_log("silent").expect("still in");
 
         match reg.list() {
@@ -315,9 +354,7 @@ mod tests {
     }
     #[test]
     fn local_listen() {
-        // let reg = Registry::default();
-        // let reg = reg.listen().expect("should be able to listen");
-        let reg = create_registry(1099);
+        let reg = create_registry(1098);
         let obj_verbose = MockRemoteObject::verbose();
         let args = vec![42; 2];
         let result_expected = obj_verbose
@@ -325,9 +362,11 @@ mod tests {
             .expect("Mock object returns the args");
         reg.bind("verbose", obj_verbose);
 
-        let rmt = reg.lookup_log("verbose").expect("verbose should be in");
+        let rmt_reg = get_registry("localhost", 1099);
+        let rmt_from_rmt_reg = rmt_reg.lookup_log("verbose").expect("verbose should be in");
+        let rmt_from_reg = reg.lookup_log("verbose").expect("verbose should be in");
 
-        let stb = Stub::new(rmt);
+        let stb = Stub::new(rmt_from_reg);
         eprintln!("Stub: {stb:?}");
 
         //NEED TO KNOW THE RETURN TYPE

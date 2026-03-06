@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::TcpClient;
 use crate::error::RMIError;
 use crate::remote::{RMIResult, RemoteRef};
-use crate::transport::{RMIRequest, Transport};
+use crate::transport::{RMIRequest, RMIResponse, Transport};
 
 pub trait RemoteTrait: Send + Sync {
     fn run_stub<T: for<'de> Deserialize<'de>, A: Serialize>(&self, arg: A) -> RMIResult<T>;
@@ -51,7 +51,7 @@ impl RemoteTrait for Stub {
         eprintln!("req: {req:?}");
         let server_addr = self.remote.addr;
         let transport = TcpClient::new(server_addr);
-        let response = transport.send(req)?;
+        let response: RMIResponse = transport.send(req)?;
 
         let bytes: Vec<u8> = response.result?;
 

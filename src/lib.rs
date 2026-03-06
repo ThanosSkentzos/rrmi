@@ -8,3 +8,6 @@ mod transport;
 use transport::TcpClient;
 
 mod error;
+
+#[cfg(any(test, feature = "bench"))]
+pub use transport::utils;

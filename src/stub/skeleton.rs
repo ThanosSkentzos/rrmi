@@ -1,8 +1,8 @@
-use std::net::{TcpStream};
+use std::net::{SocketAddr, TcpStream};
 use std::sync::Arc;
 
 use crate::error::RMIError;
-use crate::transport::utils::find_available_port;
+use crate::transport::utils::find_available_port_os;
 use std::io::{Read, Write};
 use crate::remote::{RMIResult, RemoteObject};
 use crate::transport::{RMIRequest, RMIResponse};
@@ -26,12 +26,11 @@ impl Skeleton{
         }
     }
  
-    pub fn listen(self: &Arc<Self>) -> RMIResult<u16>{
-        let taken: Vec<u16> = vec![1099];
-        let (listener,port) = find_available_port(&taken)?;
+    pub fn listen(self: &Arc<Self>) -> RMIResult<SocketAddr>{
+        let listener = find_available_port_os()?;
         let self_clone = Arc::clone(&self);
+        let addr = listener.local_addr().expect("should have address");
         std::thread::spawn(move ||{
-            eprintln!("Skeleton listening at {port}");
             for stream in listener.incoming(){
                 match stream{
                     Ok(stream) => {
@@ -43,7 +42,7 @@ impl Skeleton{
                 };
             }
         });
-        Ok(port)
+        Ok(addr)
     }
 
     fn handle_connection(&self, mut stream:TcpStream)-> RMIResult<()>{

@@ -69,9 +69,9 @@ impl Registry{
             .ok_or(RMIError::NameNotFound(name.to_string()))?;
         eprintln!("Registry spawning new thread for {name} | id: {id}");
         let skeleton = self.get(id)?;
-        let port = skeleton.listen()?;
-        let addr = self.get_addr(port);
+        let addr = skeleton.listen()?;
 
+        eprintln!("Skeleton listening at {:?}",addr);
         Ok(RemoteRef { addr, id: *id })
     }
 

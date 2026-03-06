@@ -1,46 +1,52 @@
 mod tcp;
 pub mod utils;
-pub use tcp::TcpClient;
-use serde::{Serialize,Deserialize};
-use crate::{error::RMIError, remote::RMIResult};
 use crate::RMI_ID;
+use crate::{error::RMIError, remote::RMIResult};
+use serde::{Deserialize, Serialize};
+pub use tcp::{IpAddr, Ipv4Addr, SocketAddr, TcpClient, TcpListener, TcpStream};
 
-#[derive(Serialize,Deserialize,Debug,Clone,PartialEq)]
-pub struct RMIRequest{
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct RMIRequest {
     pub object_id: RMI_ID,
-    pub method_name: String,//TODO switch to enum
+    pub method_name: String, //TODO switch to enum
     pub serialized_args: Vec<u8>,
 }
-impl RMIRequest{
-    pub fn new(object_id:RMI_ID,method_handler:String,serialized_args:Vec<u8>)->RMIRequest{
-        RMIRequest{object_id,method_name: method_handler,serialized_args}
+impl RMIRequest {
+    pub fn new(object_id: RMI_ID, method_handler: String, serialized_args: Vec<u8>) -> RMIRequest {
+        RMIRequest {
+            object_id,
+            method_name: method_handler,
+            serialized_args,
+        }
     }
 }
 
-impl Default for RMIRequest{ 
-    fn default()->RMIRequest{
-        RMIRequest{object_id:42,method_name: "test".into(),serialized_args:vec![0,1,2]}
+impl Default for RMIRequest {
+    fn default() -> RMIRequest {
+        RMIRequest {
+            object_id: 42,
+            method_name: "test".into(),
+            serialized_args: vec![0, 1, 2],
+        }
     }
 }
 
-#[derive(Serialize,Deserialize,Debug,Clone)]
-pub struct RMIResponse{
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RMIResponse {
     pub result: RMIResult<Vec<u8>>,
 }
 
-impl RMIResponse{
-    pub fn success(data: Vec<u8>) -> Self{
-        RMIResponse {
-            result: Ok(data),
-        }
+impl RMIResponse {
+    pub fn success(data: Vec<u8>) -> Self {
+        RMIResponse { result: Ok(data) }
     }
-    pub fn error(msg: String) -> Self{
-        RMIResponse { 
+    pub fn error(msg: String) -> Self {
+        RMIResponse {
             result: Err(RMIError::TransportError(msg)),
         }
     }
 }
 
-pub trait Transport: Send + Sync{
+pub trait Transport: Send + Sync {
     fn send(&self, req: RMIRequest) -> RMIResult<RMIResponse>;
 }

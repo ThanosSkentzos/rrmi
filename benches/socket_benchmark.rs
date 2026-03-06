@@ -1,7 +1,7 @@
 use std::time::Duration;
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use rrmi::utils::{find_available_port_mine,find_available_port_os}; // adjust import
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+use rrmi::utils::{find_available_port_mine, find_available_port_os}; // adjust import
 
 fn bench_ports(c: &mut Criterion) {
     let mut group = c.benchmark_group("find_available_port");
@@ -14,7 +14,9 @@ fn bench_ports(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("os", total), &total, |b, &total| {
             b.iter(|| {
                 let ports: Vec<_> = (0..total)
-                    .map(|_| black_box(find_available_port_os().expect("should have available ports")))
+                    .map(|_| {
+                        black_box(find_available_port_os().expect("should have available ports"))
+                    })
                     .collect();
                 black_box(ports)
             })
@@ -23,8 +25,10 @@ fn bench_ports(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("mine", total), &total, |b, &total| {
             b.iter(|| {
                 let ports: Vec<_> = (0..total)
-                    .map( |_| black_box(find_available_port_mine().expect("should have available ports")))
-                    .collect(); 
+                    .map(|_| {
+                        black_box(find_available_port_mine().expect("should have available ports"))
+                    })
+                    .collect();
                 black_box(ports)
             })
         });

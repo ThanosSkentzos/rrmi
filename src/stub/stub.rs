@@ -1,66 +1,71 @@
 use std::any::type_name_of_val;
 use std::fmt::Debug;
 
-use serde::{Deserialize,Serialize};
+use serde::{Deserialize, Serialize};
 
-use crate::remote::{RemoteRef,RMIResult};
 use crate::TcpClient;
-use crate::transport::{RMIRequest, Transport};
 use crate::error::RMIError;
+use crate::remote::{RMIResult, RemoteRef};
+use crate::transport::{RMIRequest, Transport};
 
-pub trait RemoteTrait: Send + Sync{
-    fn run_stub<T: for<'de> Deserialize<'de>,A:Serialize>(&self, arg: A) -> RMIResult<T>;
+pub trait RemoteTrait: Send + Sync {
+    fn run_stub<T: for<'de> Deserialize<'de>, A: Serialize>(&self, arg: A) -> RMIResult<T>;
 }
 
-pub trait RemoteTraitTest: Send + Sync{
-    fn run_stub_test<T: for<'de> Deserialize<'de>+ Default,A:Serialize+Debug>(&self, arg: A) -> RMIResult<T>;
+pub trait RemoteTraitTest: Send + Sync {
+    fn run_stub_test<T: for<'de> Deserialize<'de> + Default, A: Serialize + Debug>(
+        &self,
+        arg: A,
+    ) -> RMIResult<T>;
 }
 #[derive(Debug)]
-pub struct Stub{
+pub struct Stub {
     remote: RemoteRef,
 }
 
-impl Stub{
-    pub fn new(remote: RemoteRef) -> Self{
-        Stub {remote}
+impl Stub {
+    pub fn new(remote: RemoteRef) -> Self {
+        Stub { remote }
     }
 
-    pub fn from(remote: RemoteRef) -> Self{
-        Stub{remote}
+    pub fn from(remote: RemoteRef) -> Self {
+        Stub { remote }
     }
 }
 
-impl RemoteTrait for Stub{
-    fn run_stub<R: for<'de> Deserialize<'de>,A:Serialize> (&self, arg: A) -> RMIResult<R>{
+impl RemoteTrait for Stub {
+    fn run_stub<R: for<'de> Deserialize<'de>, A: Serialize>(&self, arg: A) -> RMIResult<R> {
         // should marshal args into binary format | serde_cbor cause bincode is deprecated. TODO ask Rob or Badia for alternative
         // construct an RMI request struct | guess this should also be serialized but maybe in transport layer
         // use transport to send and get response
         // unmasrhal result & return
 
-        let serialized_args = serde_cbor::to_vec(&arg)
-                            .map_err(|e| RMIError::SerializationError(e.to_string()))?;
+        let serialized_args =
+            serde_cbor::to_vec(&arg).map_err(|e| RMIError::SerializationError(e.to_string()))?;
 
-        let req = RMIRequest{
+        let req = RMIRequest {
             object_id: self.remote.id,
             method_name: "method_name".into(),
             serialized_args,
         };
         eprintln!("req: {req:?}");
         let server_addr = self.remote.addr;
-        let transport =TcpClient::new(server_addr) ;
+        let transport = TcpClient::new(server_addr);
         let response = transport.send(req)?;
 
-        let bytes:Vec<u8>= response.result?;
+        let bytes: Vec<u8> = response.result?;
 
-        
         let tuple: R = serde_cbor::from_slice(&bytes)
-                                .map_err(|e| RMIError::DeserializationError(e.to_string()))?;
+            .map_err(|e| RMIError::DeserializationError(e.to_string()))?;
         Ok(tuple)
     }
 }
 
-impl RemoteTraitTest for Stub{
-    fn run_stub_test<R: for<'de> Deserialize<'de>+ Default,A:Serialize+Debug>(&self, arg: A) -> RMIResult<R>{
+impl RemoteTraitTest for Stub {
+    fn run_stub_test<R: for<'de> Deserialize<'de> + Default, A: Serialize + Debug>(
+        &self,
+        arg: A,
+    ) -> RMIResult<R> {
         let t = type_name_of_val(&arg);
         let ret = R::default();
         let t_ret = type_name_of_val(&ret);
@@ -69,30 +74,31 @@ impl RemoteTraitTest for Stub{
     }
 }
 
-mod tests{
-    use std::any::{type_name_of_val};
+mod tests {
+    use std::any::type_name_of_val;
 
     use crate::remote::RMI_ID;
 
     use super::*;
 
     #[test]
-    fn different_stub_R_A(){
+    fn different_stub_R_A() {
         let s1 = Stub::new(RemoteRef::example());
         let arg1 = 42;
         let arg2 = "test".to_string();
         let arg3 = ();
         let arg4 = RMIRequest::default();
 
-        let res0:i32 = s1.run_stub_test(()).unwrap();
-        let res1:() = s1.run_stub_test(0).unwrap();
-        let res1:i32 = s1.run_stub_test(arg1).unwrap();
-        let res2: String = s1.run_stub_test((arg1,arg2.clone())).unwrap();
-        let res3:() = s1.run_stub_test(()).unwrap();
-        let res4:RMIRequest= s1.run_stub_test(("this is a test")).unwrap();
-        let res5:()= s1.run_stub_test(RMIRequest::default()).unwrap();
-        let res6:(RMIRequest,RMI_ID,i32)= s1.run_stub_test((arg1,arg2.clone(),arg3,arg4)).unwrap();
-        
+        let res0: i32 = s1.run_stub_test(()).unwrap();
+        let res1: () = s1.run_stub_test(0).unwrap();
+        let res1: i32 = s1.run_stub_test(arg1).unwrap();
+        let res2: String = s1.run_stub_test((arg1, arg2.clone())).unwrap();
+        let res3: () = s1.run_stub_test(()).unwrap();
+        let res4: RMIRequest = s1.run_stub_test(("this is a test")).unwrap();
+        let res5: () = s1.run_stub_test(RMIRequest::default()).unwrap();
+        let res6: (RMIRequest, RMI_ID, i32) =
+            s1.run_stub_test((arg1, arg2.clone(), arg3, arg4)).unwrap();
+
         let t1 = type_name_of_val(&res1);
         let t2 = type_name_of_val(&res2);
         let t3 = type_name_of_val(&res3);
@@ -100,15 +106,11 @@ mod tests{
         let t5 = type_name_of_val(&res5);
         let t6 = type_name_of_val(&res6);
 
-        assert_ne!(t1,t2);
-        assert_ne!(t2,t3);
-        assert_ne!(t3,t4);
-        assert_ne!(t4,t5);
-        assert_ne!(t5,t6);
-
-
-
+        assert_ne!(t1, t2);
+        assert_ne!(t2, t3);
+        assert_ne!(t3, t4);
+        assert_ne!(t4, t5);
+        assert_ne!(t5, t6);
     }
-
 }
 //test if 2 functions with different args can compile

@@ -1,11 +1,10 @@
-use serde::{Deserialize, Serialize};
-use thiserror::Error;
-use std::backtrace::{self, Backtrace};
 use crate::remote::RMI_ID;
+use serde::{Deserialize, Serialize};
+use std::backtrace::{self, Backtrace};
+use thiserror::Error;
 
-#[derive(Error,Debug,Clone,Serialize,Deserialize,PartialEq)]
+#[derive(Error, Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum RMIError {
-
     #[error("Serialization error: {0}")]
     SerializationError(String),
 

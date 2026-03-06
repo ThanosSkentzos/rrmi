@@ -1,6 +1,6 @@
-mod stub;
-mod skeleton;
 mod marshal;
+mod skeleton;
+mod stub;
 
 pub use skeleton::Skeleton;
-pub use stub::{Stub,RemoteTrait};
+pub use stub::{RemoteTrait, Stub};

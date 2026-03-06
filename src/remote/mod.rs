@@ -1,5 +1,5 @@
 pub mod registry;
-pub use registry::{RMI_ID, Registry};
+pub use registry::{RMI_ID, Registry,create_registry};
 
 use crate::error::RMIError;
 use crate::transport::{IpAddr, SocketAddr};

@@ -1,7 +1,8 @@
 pub type RMI_ID = usize;
 use super::{RMIResult, RemoteObject, RemoteRef};
 use crate::error::RMIError;
-use crate::stub::Skeleton;
+use crate::stub::{Skeleton, Stub};
+use crate::transport::utils;
 use crate::transport::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 
 use serde::{Deserialize, Serialize};
@@ -20,7 +21,7 @@ pub struct Registry {
 }
 
 impl Registry {
-    pub fn new(port: u16) -> Self {
+    fn new(port: u16) -> Self {
         Registry {
             port,
             objects: Arc::new(Mutex::new(HashMap::new())),
@@ -29,7 +30,7 @@ impl Registry {
         }
     }
 
-    pub fn default() -> Registry {
+    fn default() -> Registry {
         Registry::new(1099)
     }
 
@@ -39,7 +40,7 @@ impl Registry {
         SocketAddr::new(ip, port)
     }
 
-    pub fn remove(&self, name: &str) -> RMIResult<()> {
+    fn remove(&self, name: &str) -> RMIResult<()> {
         let mut names = self.names.lock().unwrap();
         let id = names
             .get(name)
@@ -57,6 +58,11 @@ impl Registry {
         Ok(())
     }
 
+    fn remove_log(&self, name: &str) -> RMIResult<()> {
+        eprintln!("removing {name}");
+        self.remove(name)
+    }
+
     pub fn get(&self, id: &RMI_ID) -> RMIResult<Arc<Skeleton>> {
         //! RMI_ID -> Skeleton | for server
         let objects = self.objects.lock().unwrap();
@@ -66,18 +72,25 @@ impl Registry {
             .ok_or(RMIError::ObjectNotFound(*id))
     }
 
-    pub fn lookup(&self, name: &str) -> RMIResult<RemoteRef> {
+    fn lookup(&self, name: &str) -> RMIResult<RemoteRef> {
         //! name -> remote ref | for client
         let names = self.names.lock().unwrap();
         let id = names
             .get(name)
             .ok_or(RMIError::NameNotFound(name.to_string()))?;
-        eprintln!("Registry spawning new thread for {name} | id: {id}");
         let skeleton = self.get(id)?;
         let port = skeleton.listen()?;
         let addr = self.get_addr(port);
-        eprintln!("Skeleton listening at {:?}", addr);
         Ok(RemoteRef { addr, id: *id })
+    }
+
+    fn lookup_log(&self, name: &str) -> RMIResult<RemoteRef> {
+        let res = self.lookup(name);
+        match res.clone() {
+            Ok(rref) => eprintln!("Skeleton listening at {:?}", rref.addr),
+            Err(_) => (),
+        }
+        res
     }
 
     pub fn list(&self) -> RMIResult<Vec<String>> {
@@ -98,7 +111,7 @@ impl Registry {
         id
     }
 
-    pub fn listen(self: &Arc<Self>) -> RMIResult<()> {
+    pub fn listen(self) -> RMIResult<Arc<Registry>> {
         let socket = SocketAddr::new(
             IpAddr::V4(Ipv4Addr::from_str("0.0.0.0").expect("0.0.0.0 should pass")),
             self.port,
@@ -106,14 +119,14 @@ impl Registry {
         let listener =
             TcpListener::bind(socket).map_err(|e| RMIError::TransportError(e.to_string()))?;
         eprintln!("RMI Registry listening on {}", socket);
-
-        let self_clone = Arc::clone(&self);
+        let arc_reg = Arc::new(self);
+        let arc_reg_clone = Arc::clone(&arc_reg);
         std::thread::spawn(move || {
             // bind separate port for each remote object + client (1 per client)
             for stream in listener.incoming() {
                 match stream {
                     Ok(stream) => {
-                        if let Err(e) = self_clone.handle_connection(stream) {
+                        if let Err(e) = arc_reg_clone.handle_connection(stream) {
                             eprintln!("Error: {e} when handling connection");
                         }
                     }
@@ -121,7 +134,7 @@ impl Registry {
                 };
             }
         });
-        Ok(())
+        Ok(arc_reg)
 
         // check variable to unbind
         // gracefull shutdown or kill?
@@ -172,6 +185,19 @@ impl Registry {
             RegistryRequest::List => RegistryResponse::List(self.list()),
         }
     }
+}
+
+pub fn create_registry(port: u16) -> Arc<Registry> {
+    let reg = Registry::new(port);
+    let reg = reg.listen().expect("Registry should be able to listen");
+    reg
+}
+
+pub fn find_registry(host: String, port: u16) -> Stub {
+    // todo!("to do this I need to ask the registry for its reference and treat it like a skeleton")
+    let addr = utils::get_server_addr(&host, port);
+    let remote_ref_ref = RemoteRef::new(addr, 0);
+    Stub::new(remote_ref_ref)
 }
 
 #[derive(Serialize, Deserialize)]
@@ -263,26 +289,23 @@ mod tests {
 
     #[test]
     fn bind_lookup_list_remove() {
-        let mut reg = Registry::default();
-        let reg = Arc::new(reg);
-        let _ = reg.listen();
+        let reg = Registry::default();
+        let reg = reg.listen().expect("Registry should be able to listen");
         let verbose = MockRemoteObject::verbose();
         let silent = MockRemoteObject::silent();
         reg.bind("verbose", verbose);
         reg.bind("silent", silent);
 
-        let remote = reg.lookup("silent").expect("silent should be in");
-        eprintln!("{remote:?}");
-        let remote = reg.lookup("verbose").expect("verbose should be in");
-        eprintln!("{remote:?}");
+        let remote = reg.lookup_log("silent").expect("silent should be in");
+        let remote = reg.lookup_log("verbose").expect("verbose should be in");
 
         let l = reg.list().expect("two already in");
         eprintln!("{:?}", l);
-        reg.remove("verbose").expect("still in");
+        reg.remove_log("verbose").expect("still in");
 
         let l = reg.list().expect("one still in");
         eprintln!("{:?}", l);
-        reg.remove("silent").expect("still in");
+        reg.remove_log("silent").expect("still in");
 
         match reg.list() {
             Ok(_) => panic!("should not have any other objects"),
@@ -292,10 +315,9 @@ mod tests {
     }
     #[test]
     fn local_listen() {
-        let reg = Registry::default();
-        let reg = Arc::new(reg);
-        let _ = reg.listen();
-
+        // let reg = Registry::default();
+        // let reg = reg.listen().expect("should be able to listen");
+        let reg = create_registry(1099);
         let obj_verbose = MockRemoteObject::verbose();
         let args = vec![42; 2];
         let result_expected = obj_verbose
@@ -303,8 +325,7 @@ mod tests {
             .expect("Mock object returns the args");
         reg.bind("verbose", obj_verbose);
 
-        let rmt = reg.lookup("verbose").expect("verbose should be in");
-        eprintln!("Remote reference: {rmt:?}");
+        let rmt = reg.lookup_log("verbose").expect("verbose should be in");
 
         let stb = Stub::new(rmt);
         eprintln!("Stub: {stb:?}");
@@ -318,11 +339,11 @@ mod tests {
 
         let obj2 = MockRemoteObject::verbose();
         reg.bind("second", obj2);
-        let rmt2 = reg.lookup("second").expect("second should be in");
+        let rmt2 = reg.lookup_log("second").expect("second should be in");
         let stb2 = Stub::new(rmt2);
 
         let args = "I'm here too!";
-        let res: RMIResult<String> = stb.run_stub(args.clone());
+        let res: RMIResult<String> = stb2.run_stub(args.clone());
         println!("{res:?}")
     }
 }

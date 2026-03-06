@@ -21,7 +21,7 @@ impl Transport for TcpClient {
         // serialize request
         // tcpstream first send byte length then bytes
         // get response
-        // eprintln!("tcp connecting...");
+        // eprintln!("tcp connecting to {}",self.server_addr);
         let mut stream = TcpStream::connect(self.server_addr)
             .map_err(|e| RMIError::TransportError(e.to_string()))?;
 
@@ -135,48 +135,22 @@ mod tests {
     use serde::Deserialize;
     use std::{
         fmt::Debug,
-        net::{IpAddr, Ipv4Addr},
-        str::FromStr,
         thread,
     };
 
     use super::*;
-
-    fn get_local_addr() -> SocketAddr {
-        let hostname = "localhost";
-        let ips: Vec<IpAddr> = dns_lookup::lookup_host(hostname).unwrap().collect();
-        eprintln!("{hostname} ips: {ips:?}");
-        let port = 10999;
-        SocketAddr::new(ips[0], port) // TODO for now use 1st entry
-    }
-
-    fn get_server_addr(hostname: &str) -> SocketAddr {
-        let ips: Vec<IpAddr> = dns_lookup::lookup_host(hostname).unwrap().collect();
-        eprintln!("{hostname} ips: {ips:?}");
-        if ips.len() == 0 {
-            //fail test if not found
-            panic!("unable to resolve hostname: {hostname}")
-        }
-        let port = 10999;
-        let mut ip: IpAddr = ips[0];
-        if ips.iter().any(|ip| ip.to_string().contains("127.0")) {
-            ip = IpAddr::from(Ipv4Addr::from_str("0.0.0.0").expect("0.0.0.0 should pass"));
-            eprintln!("{hostname} is this computer so using {ip:?}");
-        }
-        eprintln!("using {}:{port} for {hostname}", ip);
-        SocketAddr::new(ip, port)
-    }
+    use crate::utils::{get_local_addr, get_server_addr};
 
     #[test]
     fn liacs_ips() {
         let hostname = "0.0.0.0";
-        get_server_addr(hostname);
+        get_server_addr(hostname,1099);
         let hostname = "localhost";
-        get_server_addr(hostname);
+        get_server_addr(hostname,1099);
         let hostname = "0065074.student.liacs.nl";
-        get_server_addr(hostname);
+        get_server_addr(hostname,1099);
         let hostname = "0065073.student.liacs.nl";
-        get_server_addr(hostname);
+        get_server_addr(hostname,1099);
     }
 
     fn send_data(data_serial: Vec<u8>, addr: SocketAddr) {
@@ -215,7 +189,7 @@ mod tests {
 
     #[test]
     fn local_send() {
-        let addr = get_local_addr();
+        let addr = get_local_addr(10999);
         let int: i32 = 1234567890;
         let int_bytes = serde_cbor::to_vec(&int).expect("int is serializable");
         eprintln!("data: {:?}", int);
@@ -234,7 +208,7 @@ mod tests {
     fn local_get() {
         let num: i32 = 1234567890;
         eprintln!("data: {:?}", num);
-        let addr = get_local_addr();
+        let addr = get_local_addr(10999);
         let num_recv: i32 = receive_data(addr);
         assert_eq!(num_recv, num);
 
@@ -245,7 +219,7 @@ mod tests {
 
     #[test]
     fn remote_send_int() {
-        let addr = get_server_addr("0065074.student.liacs.nl");
+        let addr = get_server_addr("0065074.student.liacs.nl",10998);
         let num: i32 = 1234567890;
         let num_bytes = serde_cbor::to_vec(&num).expect("int is serializable");
         eprintln!("data: {:?}", num);
@@ -257,7 +231,7 @@ mod tests {
 
     #[test]
     fn remote_get_int() {
-        let addr = get_server_addr("0065074.student.liacs.nl");
+        let addr = get_server_addr("0065074.student.liacs.nl",10998);
         let num: i32 = 1234567890;
         let num_serial = serde_cbor::to_vec(&num).expect("int is serializable");
         eprintln!("data: {:?}", num);
@@ -269,7 +243,7 @@ mod tests {
 
     #[test]
     fn remote_send_request() {
-        let addr = get_server_addr("0065074.student.liacs.nl");
+        let addr = get_server_addr("0065074.student.liacs.nl",10999);
         let data = RMIRequest::default();
         let data_serial = serde_cbor::to_vec(&data).expect("RMIRequest is serializable");
 
@@ -279,7 +253,7 @@ mod tests {
 
     #[test]
     fn remote_get_request() {
-        let addr = get_server_addr("0065074.student.liacs.nl");
+        let addr = get_server_addr("0065074.student.liacs.nl",10999);
         let req = RMIRequest::default();
         let req_recv: RMIRequest = receive_data(addr);
         assert_eq!(req, req_recv)

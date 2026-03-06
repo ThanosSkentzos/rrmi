@@ -5,29 +5,28 @@ use std::sync::Arc;
 use crate::transport::{RMIRequest, RMIResponse, Transport};
 use crate::remote::{Registry,RMIResult};
 use crate::error::RMIError;
-use crate::stub::Skeleton;
 
 
-pub struct TcpTransport{
+pub struct TcpClient{
     server_addr: SocketAddr,
 }
 
-impl TcpTransport{
+impl TcpClient{
     pub fn new(server_addr: SocketAddr) -> Self{
-        TcpTransport { server_addr }
+        TcpClient { server_addr }
     }
 }
-impl Transport for TcpTransport{
+impl Transport for TcpClient{
     fn send(&self, req: RMIRequest) -> RMIResult<RMIResponse>{
         // connect to server
         // serialize request
         // tcpstream first send byte length then bytes
         // get response
-        eprintln!("tcp connecting...");
+        // eprintln!("tcp connecting...");
         let mut stream = TcpStream::connect(self.server_addr)
             .map_err(|e| RMIError::TransportError(e.to_string()))?;
 
-        eprintln!("tcp serializing...");
+        // eprintln!("tcp serializing...");
         let request_serialized = serde_cbor::to_vec(&req)
             .map_err(|e| RMIError::SerializationError(e.to_string()))?;
         let len = request_serialized.len() as u32;
@@ -37,7 +36,7 @@ impl Transport for TcpTransport{
         let _ = stream.write_all(&request_serialized).map_err(|e| RMIError::TransportError(e.to_string()))?;
         let _ = stream.flush().map_err(|e| RMIError::TransportError(e.to_string()))?;
 
-        eprintln!("tcp reading response len...");
+        // eprintln!("tcp reading response len...");
         // how many bytes are we getting back?
         let mut len_response_bytes = [0u8;4];
         let _ = stream.read_exact(&mut len_response_bytes);
@@ -47,10 +46,10 @@ impl Transport for TcpTransport{
         let mut response_bytes = vec![0u8;response_len];       
         let _ = stream.read_exact(&mut response_bytes);
 
-        eprintln!("tcp deserializing...");
+        // eprintln!("tcp deserializing...");
         let response: RMIResponse = serde_cbor::from_slice(&response_bytes)
                                 .map_err(|e| RMIError::DeserializationError(e.to_string()))?;
-        eprintln!("tcp deserializing...");
+        // eprintln!("tcp deserializing...");
         Ok(response)
     }
 }
@@ -58,14 +57,12 @@ impl Transport for TcpTransport{
 
 pub struct TcpServer{
     registry: Arc<Registry>,// resource count cause might be used by multiple
-    skeleton: Arc<Skeleton>,
 }
 
 impl TcpServer{
     pub fn new(registry: Arc<Registry>) -> Self{
         TcpServer {
             registry,
-            skeleton: Arc::new(Skeleton::new()),
         }
     }
 
@@ -102,8 +99,9 @@ impl TcpServer{
                         .map_err(|e| RMIError::DeserializationError(e.to_string()))?;
         eprintln!("Received request for object_id= {}, method= {}",request.object_id,request.method_name);
 
-        let object = self.registry.get(request.object_id)?;
-        let response = self.skeleton.handle_request(request, object.as_ref());
+        let object = self.registry.get(&request.object_id)?;
+        let response:RMIResult<()> = todo!();
+        // let response = self.skeleton.handle_request(request, object.as_ref());
 
         let response_bytes = serde_cbor::to_vec(&response)
                         .map_err(|e| RMIError::SerializationError(e.to_string()))?;

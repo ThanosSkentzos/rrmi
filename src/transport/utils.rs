@@ -27,7 +27,7 @@ pub fn get_local_addr(port:u16) -> SocketAddr {
 
 pub fn get_server_addr(hostname: &str,port:u16) -> SocketAddr {
     let ips: Vec<IpAddr> = dns_lookup::lookup_host(hostname).unwrap().collect();
-    eprintln!("{hostname} ips: {ips:?}");
+    eprintln!("IPs for {hostname}: {ips:?}");
     if ips.len() == 0 {
         //fail test if not found
         panic!("unable to resolve hostname: {hostname}")

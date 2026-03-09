@@ -2,7 +2,7 @@ pub type RMI_ID = usize;
 use super::{RMIResult, RemoteObject, RemoteRef};
 use crate::error::RMIError;
 use crate::stub::{Skeleton, Stub};
-use crate::transport::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
+use crate::transport::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream, receive_data, send_data};
 use crate::transport::{TcpClient, Transport, utils};
 
 use serde::{Deserialize, Serialize};
@@ -146,16 +146,7 @@ impl Registry {
     }
 
     fn handle_connection(&self, mut stream: TcpStream) -> RMIResult<()> {
-        let mut len_bytes = [0u8; 4];
-        let _ = stream
-            .read_exact(&mut len_bytes)
-            .map_err(|e| RMIError::TransportError(e.to_string()))?;
-
-        let len = u32::from_be_bytes(len_bytes) as usize;
-        let mut request_bytes = vec![0u8; len];
-        stream
-            .read_exact(&mut request_bytes)
-            .map_err(|e| RMIError::TransportError(e.to_string()))?;
+        let request_bytes = receive_data(&mut stream);
 
         let request: RegistryRequest = serde_cbor::from_slice(&request_bytes)
             .map_err(|e| RMIError::DeserializationError(e.to_string()))?;
@@ -163,20 +154,8 @@ impl Registry {
 
         let response_bytes = serde_cbor::to_vec(&response)
             .map_err(|e| RMIError::SerializationError(e.to_string()))?;
-        let len = response_bytes.len() as u32;
 
-        stream
-            .write_all(&len.to_be_bytes())
-            .map_err(|e| RMIError::TransportError(e.to_string()))?;
-        stream
-            .write_all(&response_bytes)
-            .map_err(|e| RMIError::TransportError(e.to_string()))?;
-        stream
-            .flush()
-            .map_err(|e| RMIError::TransportError(e.to_string()))?;
-
-        eprintln!("Response sent.");
-        Ok(())
+        send_data(response_bytes,&mut stream)
     }
 
     fn handle_request(&self, req: RegistryRequest) -> RegistryResponse {
@@ -264,6 +243,12 @@ mod tests {
     use local_ip_address::local_ip;
     use threadpool::ThreadPool;
 
+    static POPUL_PORT:u16 = 10996;
+    static BIND_PORT:u16 = 10997;
+    static LOCAL_PORT:u16 = 10998;
+    static REMOTE_TEST_PORT:u16 = 12345;
+    static REMOTE_HOST: &str = "0065074.student.liacs.nl";
+
     #[test]
     fn addr() {
         let reg = Registry::default();
@@ -277,7 +262,7 @@ mod tests {
 
     #[test]
     fn populate_clear() {
-        let reg = create_registry(1097);
+        let reg = create_registry(POPUL_PORT);
         let reg = Arc::new(Mutex::new(reg));
         let pool = ThreadPool::new(2);
         let jobs = 10;
@@ -326,8 +311,8 @@ mod tests {
 
     #[test]
     fn bind_lookup_list_remove() {
-        let reg = create_registry(1099);
-        let rmt_reg = get_registry("localhost", 1099);
+        let reg = create_registry(BIND_PORT);
+        let rmt_reg = get_registry("localhost", BIND_PORT);
 
         let verbose = MockRemoteObject::verbose();
         let silent = MockRemoteObject::silent();
@@ -353,33 +338,24 @@ mod tests {
             Err(_) => panic!("should return EmptyRegistry error"),
         };
     }
+
     #[test]
     fn local_listen() {
-        let port = 1097;
-        let reg = create_registry(port);
         let obj_verbose = MockRemoteObject::verbose();
         let args = vec![42; 2];
+        let res_expected = args.clone();
         eprintln!("args: {args:?}");
-        let sargs =
-            serde_cbor::to_vec(&args)
-            .map_err(|e| RMIError::SerializationError(e.to_string()))
-            .expect("should be able to serialize");
-        let resp = obj_verbose
-            .run("locally method_name", sargs)
-            .expect("Mock object returns the args");
-        let res_expected: Vec<u8>  = serde_cbor::from_slice(&resp).expect("should be able to deserialize");
-        reg.bind("verbose", obj_verbose);
 
-        let rmt_reg = get_registry("localhost", port);
+        eprintln!("reg preparation");
+        let reg = create_registry(LOCAL_PORT);
+        reg.bind("verbose", obj_verbose);
+        let rmt_reg = get_registry("localhost", LOCAL_PORT);
         let stb = rmt_reg.lookup_log("verbose").expect("verbose should be in");
 
         eprintln!("Stub: {stb:?}");
-
         //NEED TO KNOW THE RETURN TYPE
         let res: RMIResult<Vec<u8>> = stb.run_stub(args.clone());
-
         assert_eq!(res_expected, res.clone().unwrap());
-        assert_eq!(args, res.clone().unwrap());
         eprintln!("result: {res:?} matched expected\n\n");
 
         let obj2 = MockRemoteObject::verbose();
@@ -401,8 +377,6 @@ mod tests {
         assert_eq!(res2.unwrap(), res2_expected);
     }
 
-    static REMOTE_TEST_PORT:u16 = 12345;
-    static REMOTE_HOST: &str = "0065074.student.liacs.nl";
     #[test]
     fn remote_skel(){
         // assume it runs on 0065074.student.liacs.nl

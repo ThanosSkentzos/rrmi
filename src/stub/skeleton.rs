@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::error::RMIError;
 use crate::remote::{RMIResult, RemoteObject};
-use crate::transport::TcpStream;
+use crate::transport::{TcpStream, receive_data, send_data};
 use crate::transport::utils::find_available_port_os;
 use crate::transport::{RMIRequest, RMIResponse};
 use std::io::{Read, Write};
@@ -17,6 +17,7 @@ impl Skeleton {
     }
 
     pub fn handle_request(&self, request: RMIRequest) -> RMIResponse {
+        eprintln!("Skeleton got request {request:?}");
         match self
             .object
             .run(&request.method_name, request.serialized_args)
@@ -46,38 +47,15 @@ impl Skeleton {
     }
 
     fn handle_connection(&self, mut stream: TcpStream) -> RMIResult<()> {
-        let mut len_bytes = [0u8; 4];
-        let _ = stream
-            .read_exact(&mut len_bytes)
-            .map_err(|e| RMIError::TransportError(e.to_string()))?;
-
-        let len = u32::from_be_bytes(len_bytes) as usize;
-        let mut request_bytes = vec![0u8; len];
-        stream
-            .read_exact(&mut request_bytes)
-            .map_err(|e| RMIError::TransportError(e.to_string()))?;
+        let request_bytes = receive_data(&mut stream);
 
         let request: RMIRequest = serde_cbor::from_slice(&request_bytes)
             .map_err(|e| RMIError::DeserializationError(e.to_string()))?;
-        eprintln!("Skeleton got request {request:?}");
         let response = self.handle_request(request);
-        eprintln!("Skeleton response {response:?}");
         let response_bytes = serde_cbor::to_vec(&response)
             .map_err(|e| RMIError::SerializationError(e.to_string()))?;
-        let len = response_bytes.len() as u32;
 
-        stream
-            .write_all(&len.to_be_bytes())
-            .map_err(|e| RMIError::TransportError(e.to_string()))?;
-        stream
-            .write_all(&response_bytes)
-            .map_err(|e| RMIError::TransportError(e.to_string()))?;
-        stream
-            .flush()
-            .map_err(|e| RMIError::TransportError(e.to_string()))?;
-
-        eprintln!("Response sent.");
-        Ok(())
+        send_data(response_bytes,&mut stream)
     }
 }
 

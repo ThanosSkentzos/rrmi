@@ -3,7 +3,7 @@ pub mod utils;
 use crate::RMI_ID;
 use crate::{error::RMIError, remote::RMIResult};
 use serde::{Deserialize, Serialize};
-pub use tcp::{IpAddr, Ipv4Addr, SocketAddr, TcpClient, TcpListener, TcpStream};
+pub use tcp::{IpAddr, Ipv4Addr, SocketAddr, TcpClient, TcpListener, TcpStream, send_data, receive_data};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct RMIRequest {

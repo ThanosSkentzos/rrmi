@@ -18,7 +18,7 @@ pub trait RemoteTraitTest: Send + Sync {
         arg: A,
     ) -> RMIResult<T>;
 }
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub struct Stub {
     remote: RemoteRef,
 }
@@ -30,6 +30,10 @@ impl Stub {
 
     pub fn from(remote: RemoteRef) -> Self {
         Stub { remote }
+    }
+
+    pub fn get_ref(self) -> RemoteRef{
+        self.remote.clone()
     }
 }
 

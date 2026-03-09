@@ -1,7 +1,7 @@
 pub type RMI_ID = usize;
 use super::{RMIResult, RemoteObject, RemoteRef};
 use crate::error::RMIError;
-use crate::stub::Skeleton;
+use crate::stub::{Skeleton, Stub};
 use crate::transport::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 use crate::transport::{TcpClient, Transport, utils};
 
@@ -201,22 +201,22 @@ impl RegistryStub {
         RegistryStub { remote }
     }
 
-    pub fn lookup(&self, name: &str) -> RMIResult<RemoteRef> {
+    pub fn lookup(&self, name: &str) -> RMIResult<Stub> {
         let transport = TcpClient::new(self.remote.addr);
         let req = RegistryRequest::Lookup {
             name: name.to_string(),
         };
         let resp: RegistryResponse = transport.send(req)?;
         match resp{
-            RegistryResponse::Lookup(res)=> res,
+            RegistryResponse::Lookup(Ok(res))=> Ok(Stub::new(res)),
             _ => Err(RMIError::TransportError("Wrong response".to_string())),
         }
     }
 
-    fn lookup_log(&self, name: &str) -> RMIResult<RemoteRef> {
+    fn lookup_log(&self, name: &str) -> RMIResult<Stub> {
         let res = self.lookup(name);
         match res.clone() {
-            Ok(rref) => eprintln!("RegistryStub gives ref to skeleton listening at {:?}", rref.addr),
+            Ok(stub) => eprintln!("RegistryStub returned stub for skeleton listening at {:?}", stub.get_ref()),
             Err(_) => (),
         }
         res
@@ -371,9 +371,8 @@ mod tests {
         reg.bind("verbose", obj_verbose);
 
         let rmt_reg = get_registry("localhost", port);
-        let ref_from_rmt_reg = rmt_reg.lookup_log("verbose").expect("verbose should be in");
+        let stb = rmt_reg.lookup_log("verbose").expect("verbose should be in");
 
-        let stb = Stub::new(ref_from_rmt_reg);
         eprintln!("Stub: {stb:?}");
 
         //NEED TO KNOW THE RETURN TYPE
@@ -418,8 +417,7 @@ mod tests {
     fn remote_stub(){
         // runs after remote_listen on 00650??.student.liacs.nl
         let reg = get_registry(REMOTE_HOST, REMOTE_TEST_PORT);
-        let rref = reg.lookup("verbose").expect("should work");
-        let stub = Stub::new(rref);
+        let stub = reg.lookup("verbose").expect("should work");
         let resp:RMIResult<Vec<u8>> = stub.run_stub(vec![42;2]);
         println!("{resp:?}")
     }

@@ -87,7 +87,7 @@ impl Registry {
     fn lookup_log(&self, name: &str) -> RMIResult<RemoteRef> {
         let res = self.lookup(name);
         match res.clone() {
-            Ok(rref) => eprintln!("Registry sees skeleton listening at {:?}", rref.addr),
+            Ok(rref) => eprintln!("Registry gives ref to skeleton listening at {:?}", rref.addr),
             Err(_) => (),
         }
         res
@@ -159,7 +159,7 @@ impl Registry {
 
         let request: RegistryRequest = serde_cbor::from_slice(&request_bytes)
             .map_err(|e| RMIError::DeserializationError(e.to_string()))?;
-        let response = self.handle_request(request);
+        let response: RegistryResponse = self.handle_request(request);
 
         let response_bytes = serde_cbor::to_vec(&response)
             .map_err(|e| RMIError::SerializationError(e.to_string()))?;
@@ -216,7 +216,7 @@ impl RegistryStub {
     fn lookup_log(&self, name: &str) -> RMIResult<RemoteRef> {
         let res = self.lookup(name);
         match res.clone() {
-            Ok(rref) => eprintln!("RegistryStub sees skeleton listening at {:?}", rref.addr),
+            Ok(rref) => eprintln!("RegistryStub gives ref to skeleton listening at {:?}", rref.addr),
             Err(_) => (),
         }
         res
@@ -260,6 +260,7 @@ mod tests {
         stub::{RemoteTrait, Stub},
     };
     use core::{panic, time};
+    use std::{thread, time::Duration};
     use local_ip_address::local_ip;
     use threadpool::ThreadPool;
 
@@ -343,7 +344,7 @@ mod tests {
 
         let l = reg.list().expect("one still in");
         let l_rmt = rmt_reg.list().expect("same");
-        eprintln!("local: {:?} vs remote: {:?}", l,l_rmt);
+        eprintln!("local: {:?} vs remote: {:?}", l, l_rmt);
         reg.remove_log("silent").expect("still in");
 
         match reg.list() {
@@ -354,35 +355,72 @@ mod tests {
     }
     #[test]
     fn local_listen() {
-        let reg = create_registry(1098);
+        let port = 1097;
+        let reg = create_registry(port);
         let obj_verbose = MockRemoteObject::verbose();
         let args = vec![42; 2];
-        let result_expected = obj_verbose
-            .run("locally method_name", args.clone())
+        eprintln!("args: {args:?}");
+        let sargs =
+            serde_cbor::to_vec(&args)
+            .map_err(|e| RMIError::SerializationError(e.to_string()))
+            .expect("should be able to serialize");
+        let resp = obj_verbose
+            .run("locally method_name", sargs)
             .expect("Mock object returns the args");
+        let res_expected: Vec<u8>  = serde_cbor::from_slice(&resp).expect("should be able to deserialize");
         reg.bind("verbose", obj_verbose);
 
-        let rmt_reg = get_registry("localhost", 1099);
-        let rmt_from_rmt_reg = rmt_reg.lookup_log("verbose").expect("verbose should be in");
-        let rmt_from_reg = reg.lookup_log("verbose").expect("verbose should be in");
+        let rmt_reg = get_registry("localhost", port);
+        let ref_from_rmt_reg = rmt_reg.lookup_log("verbose").expect("verbose should be in");
 
-        let stb = Stub::new(rmt_from_reg);
+        let stb = Stub::new(ref_from_rmt_reg);
         eprintln!("Stub: {stb:?}");
 
         //NEED TO KNOW THE RETURN TYPE
         let res: RMIResult<Vec<u8>> = stb.run_stub(args.clone());
-        eprintln!("result: {res:?}\n\n");
 
-        assert_eq!(result_expected, res.clone().unwrap());
+        assert_eq!(res_expected, res.clone().unwrap());
         assert_eq!(args, res.clone().unwrap());
+        eprintln!("result: {res:?} matched expected\n\n");
 
         let obj2 = MockRemoteObject::verbose();
+        let args2 = "I'm here too!";
+        let sargs2 =
+            serde_cbor::to_vec(&args2)
+            .map_err(|e| RMIError::SerializationError(e.to_string()))
+            .expect("should be able to serialize");
+        let resp2 = obj2
+            .run("locally method_name", sargs2)
+            .expect("Mock object returns the args");
+        let res2_expected: String = serde_cbor::from_slice(&resp2).expect("should be able to deserialize");
         reg.bind("second", obj2);
         let rmt2 = reg.lookup_log("second").expect("second should be in");
         let stb2 = Stub::new(rmt2);
 
-        let args = "I'm here too!";
-        let res: RMIResult<String> = stb2.run_stub(args.clone());
-        println!("{res:?}")
+        let res2: RMIResult<String> = stb2.run_stub(args2.clone());
+        eprintln!("result: {res2:?} matched expected\n\n");
+        assert_eq!(res2.unwrap(), res2_expected);
+    }
+
+    static REMOTE_TEST_PORT:u16 = 12345;
+    static REMOTE_HOST: &str = "0065074.student.liacs.nl";
+    #[test]
+    fn remote_skel(){
+        // assume it runs on 0065074.student.liacs.nl
+        let reg = create_registry(REMOTE_TEST_PORT);
+        let obj_verbose = MockRemoteObject::verbose();
+        reg.bind("verbose", obj_verbose);
+        // how to block
+        thread::sleep(Duration::from_secs(5));
+    }
+
+    #[test]
+    fn remote_stub(){
+        // runs after remote_listen on 00650??.student.liacs.nl
+        let reg = get_registry(REMOTE_HOST, REMOTE_TEST_PORT);
+        let rref = reg.lookup("verbose").expect("should work");
+        let stub = Stub::new(rref);
+        let resp:RMIResult<Vec<u8>> = stub.run_stub(vec![42;2]);
+        println!("{resp:?}")
     }
 }

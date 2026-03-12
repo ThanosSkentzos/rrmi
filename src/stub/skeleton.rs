@@ -49,11 +49,9 @@ impl Skeleton {
     fn handle_connection(&self, mut stream: TcpStream) -> RMIResult<()> {
         let request_bytes = receive_data(&mut stream);
 
-        let request: RMIRequest =
-            unmarshal(&request_bytes).map_err(|e| RMIError::DeserializationError(e.to_string()))?;
+        let request: RMIRequest = unmarshal(&request_bytes)?;
         let response = self.handle_request(request);
-        let response_bytes =
-            marshal(&response).map_err(|e| RMIError::SerializationError(e.to_string()))?;
+        let response_bytes = marshal(&response)?;
 
         send_data(response_bytes, &mut stream)
     }

@@ -6,13 +6,14 @@ pub fn marshal<T: Serialize>(data: &T) -> RMIResult<Vec<u8>> {
     serde_cbor::to_vec(&data).map_err(|e| RMIError::SerializationError(e.to_string()))
 }
 pub fn unmarshal<T: for<'de> Deserialize<'de>>(bytes: &Vec<u8>) -> RMIResult<T> {
-    serde_cbor::from_slice(&bytes).map_err(|e| RMIError::SerializationError(e.to_string()))
+    serde_cbor::from_slice(&bytes).map_err(|e| RMIError::DeserializationError(e.to_string()))
 }
 
 #[cfg(test)]
 mod tests {
     use super::{marshal, unmarshal};
     use crate::{remote::RMI_ID, transport::RMIRequest};
+    
     #[test]
     fn serde_int() {
         let data: i32 = 1;
@@ -38,6 +39,7 @@ mod tests {
         eprintln!("after: {:?}", result);
         assert_eq!(data, result);
     }
+
     #[test]
     fn serde_args() {
         let object_id: RMI_ID = 1;

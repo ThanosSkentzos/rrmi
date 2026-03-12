@@ -151,14 +151,11 @@ impl Registry {
 
     fn handle_connection(&self, mut stream: TcpStream) -> RMIResult<()> {
         let request_bytes = receive_data(&mut stream);
+        let request: RegistryRequest = unmarshal(&request_bytes)?;
 
-        let request: RegistryRequest =
-            unmarshal(&request_bytes).map_err(|e| RMIError::DeserializationError(e.to_string()))?;
         let response: RegistryResponse = self.handle_request(request);
 
-        let response_bytes =
-            marshal(&response).map_err(|e| RMIError::SerializationError(e.to_string()))?;
-
+        let response_bytes = marshal(&response)?;
         send_data(response_bytes, &mut stream)
     }
 

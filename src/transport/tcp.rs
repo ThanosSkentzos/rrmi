@@ -100,8 +100,7 @@ impl TcpServer {
 
     fn handle_connection(&self, mut stream: TcpStream) -> RMIResult<()> {
         let request_bytes = receive_data(&mut stream);
-        let request: RMIRequest =
-            unmarshal(&request_bytes).map_err(|e| RMIError::DeserializationError(e.to_string()))?;
+        let request: RMIRequest = unmarshal(&request_bytes)?;
         eprintln!(
             "Received request for object_id= {}, method= {}",
             request.object_id, request.method_name
@@ -111,10 +110,7 @@ impl TcpServer {
         let response: RMIResult<()> = todo!();
         // let response = self.skeleton.handle_request(request, object.as_ref());
 
-        let response_bytes =
-            marshal(&response).map_err(|e| RMIError::SerializationError(e.to_string()))?;
-        let len = response_bytes.len() as u32;
-
+        let response_bytes = marshal(&response)?;
         send_data(response_bytes, &mut stream)
     }
 }

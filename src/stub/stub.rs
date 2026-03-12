@@ -4,7 +4,6 @@ use std::fmt::Debug;
 use serde::{Deserialize, Serialize};
 
 use crate::TcpClient;
-use crate::error::RMIError;
 use crate::remote::{RMIResult, RemoteRef};
 use crate::stub::{marshal, unmarshal};
 use crate::transport::{RMIRequest, RMIResponse, Transport};
@@ -40,8 +39,7 @@ impl Stub {
 
 impl RemoteTrait for Stub {
     fn run_stub<R: for<'de> Deserialize<'de>, A: Serialize>(&self, arg: A) -> RMIResult<R> {
-        let serialized_args =
-            marshal(&arg).map_err(|e| RMIError::SerializationError(e.to_string()))?;
+        let serialized_args = marshal(&arg)?;
 
         let req = RMIRequest {
             object_id: self.remote.id,
@@ -54,9 +52,7 @@ impl RemoteTrait for Stub {
         let response: RMIResponse = transport.send(req)?;
 
         let bytes: Vec<u8> = response.result?;
-
-        let tuple: R =
-            unmarshal(&bytes).map_err(|e| RMIError::DeserializationError(e.to_string()))?;
+        let tuple: R = unmarshal(&bytes)?;
         Ok(tuple)
     }
 }

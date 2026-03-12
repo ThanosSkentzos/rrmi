@@ -161,7 +161,7 @@ impl Registry {
 
     fn handle_request(&self, req: RegistryRequest) -> RegistryResponse {
         match req {
-            RegistryRequest::Lookup { name } => RegistryResponse::Lookup(self.lookup(&name)),
+            RegistryRequest::Lookup(name) => RegistryResponse::Lookup(self.lookup(&name)),
             RegistryRequest::List => RegistryResponse::List(self.list()),
         }
     }
@@ -183,9 +183,7 @@ impl RegistryStub {
 
     pub fn lookup(&self, name: &str) -> RMIResult<Stub> {
         let transport = TcpClient::new(self.remote.addr);
-        let req = RegistryRequest::Lookup {
-            name: name.to_string(),
-        };
+        let req = RegistryRequest::Lookup(name.to_string());
         let resp: RegistryResponse = transport.send(req)?;
         match resp {
             RegistryResponse::Lookup(Ok(res)) => Ok(Stub::new(res)),
@@ -225,7 +223,7 @@ pub fn get_registry(host: &str, port: u16) -> RegistryStub {
 
 #[derive(Serialize, Deserialize)]
 pub enum RegistryRequest {
-    Lookup { name: String },
+    Lookup(String),
     List,
 }
 

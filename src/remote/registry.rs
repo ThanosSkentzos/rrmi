@@ -9,7 +9,6 @@ use crate::transport::{TcpClient, Transport, utils};
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::io::{Read, Write};
 use std::str::FromStr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -221,7 +220,7 @@ impl RegistryStub {
 }
 
 pub fn get_registry(host: &str, port: u16) -> RegistryStub {
-    let addr = utils::get_server_addr(&host, port);
+    let addr = utils::get_addr(&host, port);
     let remote_ref_ref = RemoteRef::new(addr, 0);
     RegistryStub::new(remote_ref_ref)
     // todo!("to do this I need to ask the registry for its reference and treat it like a skeleton")
@@ -383,6 +382,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn remote_skel() {
         // assume it runs on 0065074.student.liacs.nl
         let reg = create_registry(REMOTE_TEST_PORT);
@@ -390,14 +390,17 @@ mod tests {
         reg.bind("verbose", obj_verbose);
         // how to block
         thread::sleep(Duration::from_secs(5));
+        todo!("receive ok");
     }
 
     #[test]
+    #[ignore]
     fn remote_stub() {
         // runs after remote_listen on 00650??.student.liacs.nl
         let reg = get_registry(REMOTE_HOST, REMOTE_TEST_PORT);
         let stub = reg.lookup("verbose").expect("should work");
         let resp: RMIResult<Vec<u8>> = stub.run_stub(vec![42; 2]);
-        println!("{resp:?}")
+        println!("{resp:?}");
+        todo!("send ok");
     }
 }

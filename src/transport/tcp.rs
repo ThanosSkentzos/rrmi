@@ -125,26 +125,47 @@ mod tests {
     use std::thread;
 
     use super::*;
-    use crate::utils::{get_local_addr, get_server_addr};
+    use crate::utils::get_addr;
+    static HOSTNAME_RECV:&str = "0065074.student.liacs.nl";
+    static REMOTE_TEST_PORT: u16 = 12345;
 
     #[test]
+    #[ignore]
     fn liacs_ips() {
         let hostname = "0.0.0.0";
-        get_server_addr(hostname, 1099);
+        get_addr(hostname, 1099);
         let hostname = "localhost";
-        get_server_addr(hostname, 1099);
+        get_addr(hostname, 1099);
         let hostname = "0065074.student.liacs.nl";
-        get_server_addr(hostname, 1099);
+        get_addr(hostname, 1099);
         let hostname = "0065073.student.liacs.nl";
-        get_server_addr(hostname, 1099);
+        get_addr(hostname, 1099);
+    }
+
+    #[test]
+    fn local_tcp_test() {
+        let recv_handle = thread::spawn(|| {
+            get_int_struct("localhost");
+        });
+        thread::sleep(std::time::Duration::from_millis(100));
+        send_int_struct("localhost");
+        recv_handle.join().unwrap();
+    }
+
+    #[test]
+    fn remote_send(){
+        send_int_struct(HOSTNAME_RECV);
+    }
+    #[test]
+    fn remote_recv(){
+        get_int_struct(HOSTNAME_RECV);
     }
 
     static LOCAL_GET_SEND: u16 = 10999;
-    #[test]
-    fn local_get() {
+    fn get_int_struct(hostname:&str) {
         let num: i32 = 1234567890;
         eprintln!("data: {:?}", num);
-        let addr = get_local_addr(LOCAL_GET_SEND);
+        let addr = get_addr(hostname, LOCAL_GET_SEND);
         // let mut stream = TcpStream::connect(addr).unwrap();
         let listener = TcpListener::bind(addr).expect("should be free");
         let (mut stream, _) = listener.accept().expect("should send");
@@ -158,69 +179,19 @@ mod tests {
         assert_eq!(req_recv, req);
     }
 
-    #[test]
-    fn local_send() {
-        let addr = get_local_addr(LOCAL_GET_SEND);
+    fn send_int_struct(hostname:&str) {
+        let addr = get_addr(hostname, LOCAL_GET_SEND);
         let mut stream = TcpStream::connect(addr).unwrap();
         let int: i32 = 1234567890;
         let int_bytes = marshal(&int).expect("int is serializable");
         eprintln!("data: {:?}", int);
         eprintln!("serialized: {:?}", int_bytes);
-        thread::sleep(time::Duration::from_millis(1000)); //at first was failing randomly, probably race condition with server thread
 
-        send_data(int_bytes.clone(), &mut stream);
+        let _ = send_data(int_bytes.clone(), &mut stream);
 
         let request = RMIRequest::default();
         let request_bytes = marshal(&request).expect("RMIRequest is serializable");
-        thread::sleep(time::Duration::from_millis(300)); //at first was failing randomly, probably race condition with server thread
-        send_data(request_bytes, &mut stream);
+        let _ = send_data(request_bytes, &mut stream);
     }
 
-    #[test]
-    fn remote_send_int() {
-        let addr = get_server_addr("0065074.student.liacs.nl", 10998);
-        let mut stream = TcpStream::connect(addr).unwrap();
-        let num: i32 = 1234567890;
-        let num_bytes = marshal(&num).expect("int is serializable");
-        eprintln!("data: {:?}", num);
-        eprintln!("serialized: {:?}", num_bytes);
-
-        thread::sleep(time::Duration::from_millis(100)); //at first was failing randomly, probably race condition with server thread
-        send_data(num_bytes.clone(), &mut stream);
-    }
-
-    #[test]
-    fn remote_get_int() {
-        let addr = get_server_addr("0065074.student.liacs.nl", 10998);
-        let mut stream = TcpStream::connect(addr).unwrap();
-        let num: i32 = 1234567890;
-        let num_serial = marshal(&num).expect("int is serializable");
-        eprintln!("data: {:?}", num);
-        eprintln!("serialized: {:?}", num_serial);
-
-        let bytes = receive_data(&mut stream);
-        let num_recv: i32 = unmarshal(&bytes).expect("i32");
-        assert_eq!(num, num_recv);
-    }
-
-    #[test]
-    fn remote_send_request() {
-        let addr = get_server_addr("0065074.student.liacs.nl", 10999);
-        let mut stream = TcpStream::connect(addr).unwrap();
-        let data = RMIRequest::default();
-        let data_serial = marshal(&data).expect("RMIRequest is serializable");
-
-        thread::sleep(time::Duration::from_millis(10));
-        send_data(data_serial, &mut stream);
-    }
-
-    #[test]
-    fn remote_get_request() {
-        let addr = get_server_addr("0065074.student.liacs.nl", 10999);
-        let mut stream = TcpStream::connect(addr).unwrap();
-        let req = RMIRequest::default();
-        let bytes = receive_data(&mut stream);
-        let req_recv: RMIRequest = unmarshal(&bytes).expect("RMIRequest");
-        assert_eq!(req, req_recv)
-    }
 }

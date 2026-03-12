@@ -6,7 +6,6 @@ use crate::stub::{marshal, unmarshal};
 use crate::transport::utils::find_available_port_os;
 use crate::transport::{RMIRequest, RMIResponse};
 use crate::transport::{TcpStream, receive_data, send_data};
-use std::io::{Read, Write};
 
 pub struct Skeleton {
     object: Arc<dyn RemoteObject>, // Arc because eventually we to listen from several ports

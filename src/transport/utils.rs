@@ -14,18 +14,11 @@ pub fn find_available_port_mine() -> RMIResult<(TcpListener, u16)> {
     }
     Err(RMIError::TransportError("No available ports".to_string()))
 }
-pub fn find_available_port_os() -> RMIResult<(TcpListener)> {
+pub fn find_available_port_os() -> RMIResult<TcpListener> {
     TcpListener::bind(("0.0.0.0", 0)).map_err(|e| RMIError::TransportError(e.to_string()))
 }
 
-pub fn get_local_addr(port: u16) -> SocketAddr {
-    let hostname = "localhost";
-    let ips: Vec<IpAddr> = dns_lookup::lookup_host(hostname).unwrap().collect();
-    eprintln!("{hostname} ips: {ips:?}");
-    SocketAddr::new(ips[0], port) // TODO for now use 1st entry
-}
-
-pub fn get_server_addr(hostname: &str, port: u16) -> SocketAddr {
+pub fn get_addr(hostname: &str, port: u16) -> SocketAddr {
     let ips: Vec<IpAddr> = dns_lookup::lookup_host(hostname).unwrap().collect();
     eprintln!("IPs for {hostname}: {ips:?}");
     if ips.len() == 0 {

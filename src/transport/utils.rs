@@ -1,5 +1,5 @@
+use crate::transport::tcp::{IpAddr, Ipv4Addr, SocketAddr, TcpListener};
 use crate::{error::RMIError, remote::RMIResult};
-use crate::transport::tcp::{TcpListener,IpAddr,Ipv4Addr,SocketAddr};
 use std::str::FromStr;
 
 static START: u16 = 31768;
@@ -18,14 +18,14 @@ pub fn find_available_port_os() -> RMIResult<(TcpListener)> {
     TcpListener::bind(("0.0.0.0", 0)).map_err(|e| RMIError::TransportError(e.to_string()))
 }
 
-pub fn get_local_addr(port:u16) -> SocketAddr {
+pub fn get_local_addr(port: u16) -> SocketAddr {
     let hostname = "localhost";
     let ips: Vec<IpAddr> = dns_lookup::lookup_host(hostname).unwrap().collect();
     eprintln!("{hostname} ips: {ips:?}");
     SocketAddr::new(ips[0], port) // TODO for now use 1st entry
 }
 
-pub fn get_server_addr(hostname: &str,port:u16) -> SocketAddr {
+pub fn get_server_addr(hostname: &str, port: u16) -> SocketAddr {
     let ips: Vec<IpAddr> = dns_lookup::lookup_host(hostname).unwrap().collect();
     eprintln!("IPs for {hostname}: {ips:?}");
     if ips.len() == 0 {
@@ -33,7 +33,10 @@ pub fn get_server_addr(hostname: &str,port:u16) -> SocketAddr {
         panic!("unable to resolve hostname: {hostname}")
     }
     let mut ip: IpAddr = ips[0];
-    if ips.iter().any(|ip| ip.to_string().contains("127.0") || ip.to_string().contains("localhost")) {
+    if ips
+        .iter()
+        .any(|ip| ip.to_string().contains("127.0") || ip.to_string().contains("localhost"))
+    {
         ip = IpAddr::from(Ipv4Addr::from_str("0.0.0.0").expect("0.0.0.0 should pass"));
         eprintln!("{hostname} is this computer so using {ip:?}");
     }

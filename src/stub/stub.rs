@@ -71,10 +71,7 @@ impl RemoteTraitTest for Stub {
 }
 
 mod tests {
-    use std::any::type_name_of_val;
-
     use crate::remote::RMI_ID;
-
     use super::*;
 
     #[test]

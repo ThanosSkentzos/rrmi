@@ -2,17 +2,17 @@ pub type RMI_ID = usize;
 use super::{RMIResult, RemoteObject, RemoteRef};
 use crate::error::RMIError;
 use crate::stub::{Skeleton, Stub, marshal, unmarshal};
+use crate::transport::utils::{get_addr, get_local_ips};
 use crate::transport::{
     IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream, receive_data, send_data,
 };
-use crate::transport::{TcpClient, Transport, utils};
+use crate::transport::{TcpClient, Transport};
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-
 pub struct Registry {
     // a hashmap with all objects
     port: u16,
@@ -37,7 +37,8 @@ impl Registry {
 
     fn get_addr(&self, port: u16) -> SocketAddr {
         // this will be slower than just saving it
-        let ip = local_ip_address::local_ip().expect("Should be able to get local ip");
+        let ips = get_local_ips().expect("Should be able to get local ip");
+        let ip = ips[0]; //use 1st for now TODO handle eth or ib
         SocketAddr::new(ip, port)
     }
 
@@ -50,7 +51,7 @@ impl Registry {
         names.remove(name);
 
         let mut objects = self.objects.lock().unwrap();
-        let sk = objects.remove(&id).ok_or(RMIError::ObjectNotFound(id))?;
+        let _sk = objects.remove(&id).ok_or(RMIError::ObjectNotFound(id))?;
         // todo!("make sure the object is also droped");
         // let left = objects.keys().count();
         // let strong = Arc::strong_count(&sk);
@@ -130,6 +131,7 @@ impl Registry {
             for stream in listener.incoming() {
                 match stream {
                     Ok(stream) => {
+                        eprintln!("Received connection from {:?}", stream.peer_addr());
                         if let Err(e) = arc_reg_clone.handle_connection(stream) {
                             eprintln!("Error: {e} when handling connection");
                         }
@@ -215,7 +217,7 @@ impl RegistryStub {
 }
 
 pub fn get_registry(host: &str, port: u16) -> RegistryStub {
-    let addr = utils::get_addr(&host, port);
+    let addr = get_addr(&host, port);
     let remote_ref_ref = RemoteRef::new(addr, 0);
     RegistryStub::new(remote_ref_ref)
     // todo!("to do this I need to ask the registry for its reference and treat it like a skeleton")
@@ -241,7 +243,6 @@ mod tests {
         stub::{RemoteTrait, Stub, marshal, unmarshal},
     };
     use core::{panic, time};
-    use local_ip_address::local_ip;
     use std::{thread, time::Duration};
     use threadpool::ThreadPool;
 
@@ -256,9 +257,10 @@ mod tests {
         let reg = Registry::default();
         let port = reg.port;
         let addr = reg.get_addr(port);
+        let ip = get_local_ips().expect("Should be able to get ips")[0];
         assert_eq!(
             addr,
-            SocketAddr::new(local_ip().expect("Should be able to get ip"), port)
+            SocketAddr::new(ip, port)
         )
     }
 

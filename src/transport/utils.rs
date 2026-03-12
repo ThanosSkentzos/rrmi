@@ -1,3 +1,5 @@
+use if_addrs::Interface;
+
 use crate::transport::tcp::{IpAddr, Ipv4Addr, SocketAddr, TcpListener};
 use crate::{error::RMIError, remote::RMIResult};
 use std::str::FromStr;
@@ -37,12 +39,42 @@ pub fn get_addr(hostname: &str, port: u16) -> SocketAddr {
     SocketAddr::new(ip, port)
 }
 
+pub fn get_local_ips() -> Result<Vec<IpAddr>, ()> {
+    let ips = if_addrs::get_if_addrs()
+        .map_err(|err| {
+            eprintln!("Error getting ips: {err}");
+            ()
+        })?
+        .into_iter()
+        .filter(|iface| !iface.is_loopback())
+        .map(|iface| iface.ip())
+        .collect();
+    Ok(ips)
+}
+fn get_local_ifs() -> Result<Vec<Interface>, ()> {
+    let ifs = if_addrs::get_if_addrs()
+        .map_err(|err| {
+            eprintln!("Error getting ips: {err}");
+            ()
+        })?
+        .into_iter()
+        .filter(|iface| !iface.is_loopback())
+        .collect();
+    Ok(ifs)
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
     use super::*;
     static TOTAL: usize = 100;
+    #[test]
+    fn get_own_ips() {
+        eprintln!("{:#?}", get_local_ips());
+        eprintln!("{:#?}", get_local_ifs());
+    }
+
     #[test]
     fn get_ports_mine() {
         let start = SystemTime::now()

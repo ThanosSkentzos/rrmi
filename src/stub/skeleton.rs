@@ -2,9 +2,10 @@ use std::sync::Arc;
 
 use crate::error::RMIError;
 use crate::remote::{RMIResult, RemoteObject};
-use crate::transport::{TcpStream, receive_data, send_data};
+use crate::stub::{marshal, unmarshal};
 use crate::transport::utils::find_available_port_os;
 use crate::transport::{RMIRequest, RMIResponse};
+use crate::transport::{TcpStream, receive_data, send_data};
 use std::io::{Read, Write};
 
 pub struct Skeleton {
@@ -49,13 +50,13 @@ impl Skeleton {
     fn handle_connection(&self, mut stream: TcpStream) -> RMIResult<()> {
         let request_bytes = receive_data(&mut stream);
 
-        let request: RMIRequest = serde_cbor::from_slice(&request_bytes)
-            .map_err(|e| RMIError::DeserializationError(e.to_string()))?;
+        let request: RMIRequest =
+            unmarshal(&request_bytes).map_err(|e| RMIError::DeserializationError(e.to_string()))?;
         let response = self.handle_request(request);
-        let response_bytes = serde_cbor::to_vec(&response)
-            .map_err(|e| RMIError::SerializationError(e.to_string()))?;
+        let response_bytes =
+            marshal(&response).map_err(|e| RMIError::SerializationError(e.to_string()))?;
 
-        send_data(response_bytes,&mut stream)
+        send_data(response_bytes, &mut stream)
     }
 }
 

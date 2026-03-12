@@ -1,8 +1,10 @@
 pub type RMI_ID = usize;
 use super::{RMIResult, RemoteObject, RemoteRef};
 use crate::error::RMIError;
-use crate::stub::{Skeleton, Stub};
-use crate::transport::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream, receive_data, send_data};
+use crate::stub::{Skeleton, Stub, marshal, unmarshal};
+use crate::transport::{
+    IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream, receive_data, send_data,
+};
 use crate::transport::{TcpClient, Transport, utils};
 
 use serde::{Deserialize, Serialize};
@@ -87,7 +89,10 @@ impl Registry {
     fn lookup_log(&self, name: &str) -> RMIResult<RemoteRef> {
         let res = self.lookup(name);
         match res.clone() {
-            Ok(rref) => eprintln!("Registry gives ref to skeleton listening at {:?}", rref.addr),
+            Ok(rref) => eprintln!(
+                "Registry gives ref to skeleton listening at {:?}",
+                rref.addr
+            ),
             Err(_) => (),
         }
         res
@@ -148,14 +153,14 @@ impl Registry {
     fn handle_connection(&self, mut stream: TcpStream) -> RMIResult<()> {
         let request_bytes = receive_data(&mut stream);
 
-        let request: RegistryRequest = serde_cbor::from_slice(&request_bytes)
-            .map_err(|e| RMIError::DeserializationError(e.to_string()))?;
+        let request: RegistryRequest =
+            unmarshal(&request_bytes).map_err(|e| RMIError::DeserializationError(e.to_string()))?;
         let response: RegistryResponse = self.handle_request(request);
 
-        let response_bytes = serde_cbor::to_vec(&response)
-            .map_err(|e| RMIError::SerializationError(e.to_string()))?;
+        let response_bytes =
+            marshal(&response).map_err(|e| RMIError::SerializationError(e.to_string()))?;
 
-        send_data(response_bytes,&mut stream)
+        send_data(response_bytes, &mut stream)
     }
 
     fn handle_request(&self, req: RegistryRequest) -> RegistryResponse {
@@ -186,8 +191,8 @@ impl RegistryStub {
             name: name.to_string(),
         };
         let resp: RegistryResponse = transport.send(req)?;
-        match resp{
-            RegistryResponse::Lookup(Ok(res))=> Ok(Stub::new(res)),
+        match resp {
+            RegistryResponse::Lookup(Ok(res)) => Ok(Stub::new(res)),
             _ => Err(RMIError::TransportError("Wrong response".to_string())),
         }
     }
@@ -195,7 +200,10 @@ impl RegistryStub {
     fn lookup_log(&self, name: &str) -> RMIResult<Stub> {
         let res = self.lookup(name);
         match res.clone() {
-            Ok(stub) => eprintln!("RegistryStub returned stub for skeleton listening at {:?}", stub.get_ref()),
+            Ok(stub) => eprintln!(
+                "RegistryStub returned stub for skeleton listening at {:?}",
+                stub.get_ref()
+            ),
             Err(_) => (),
         }
         res
@@ -205,8 +213,8 @@ impl RegistryStub {
         let transport = TcpClient::new(self.remote.addr);
         let req = RegistryRequest::List {};
         let resp: RegistryResponse = transport.send(req)?;
-        match resp{
-            RegistryResponse::List(res)=> res,
+        match resp {
+            RegistryResponse::List(res) => res,
             _ => Err(RMIError::TransportError("Wrong response".to_string())),
         }
     }
@@ -236,17 +244,17 @@ mod tests {
     use super::*;
     use crate::{
         remote::MockRemoteObject,
-        stub::{RemoteTrait, Stub},
+        stub::{RemoteTrait, Stub, marshal, unmarshal},
     };
     use core::{panic, time};
-    use std::{thread, time::Duration};
     use local_ip_address::local_ip;
+    use std::{thread, time::Duration};
     use threadpool::ThreadPool;
 
-    static POPUL_PORT:u16 = 10996;
-    static BIND_PORT:u16 = 10997;
-    static LOCAL_PORT:u16 = 10998;
-    static REMOTE_TEST_PORT:u16 = 12345;
+    static POPUL_PORT: u16 = 10996;
+    static BIND_PORT: u16 = 10997;
+    static LOCAL_PORT: u16 = 10998;
+    static REMOTE_TEST_PORT: u16 = 12345;
     static REMOTE_HOST: &str = "0065074.student.liacs.nl";
 
     #[test]
@@ -324,7 +332,7 @@ mod tests {
 
         let l = reg.list().expect("two already in");
         let l_rmt = rmt_reg.list().expect("same");
-        eprintln!("local: {:?} vs remote: {:?}", l,l_rmt);
+        eprintln!("local: {:?} vs remote: {:?}", l, l_rmt);
         reg.remove_log("verbose").expect("still in");
 
         let l = reg.list().expect("one still in");
@@ -360,14 +368,11 @@ mod tests {
 
         let obj2 = MockRemoteObject::verbose();
         let args2 = "I'm here too!";
-        let sargs2 =
-            serde_cbor::to_vec(&args2)
-            .map_err(|e| RMIError::SerializationError(e.to_string()))
-            .expect("should be able to serialize");
+        let sargs2 = marshal(&args2).expect("should be able to serialize");
         let resp2 = obj2
             .run("locally method_name", sargs2)
             .expect("Mock object returns the args");
-        let res2_expected: String = serde_cbor::from_slice(&resp2).expect("should be able to deserialize");
+        let res2_expected: String = unmarshal(&resp2).expect("should be able to deserialize");
         reg.bind("second", obj2);
         let rmt2 = reg.lookup_log("second").expect("second should be in");
         let stb2 = Stub::new(rmt2);
@@ -378,7 +383,7 @@ mod tests {
     }
 
     #[test]
-    fn remote_skel(){
+    fn remote_skel() {
         // assume it runs on 0065074.student.liacs.nl
         let reg = create_registry(REMOTE_TEST_PORT);
         let obj_verbose = MockRemoteObject::verbose();
@@ -388,11 +393,11 @@ mod tests {
     }
 
     #[test]
-    fn remote_stub(){
+    fn remote_stub() {
         // runs after remote_listen on 00650??.student.liacs.nl
         let reg = get_registry(REMOTE_HOST, REMOTE_TEST_PORT);
         let stub = reg.lookup("verbose").expect("should work");
-        let resp:RMIResult<Vec<u8>> = stub.run_stub(vec![42;2]);
+        let resp: RMIResult<Vec<u8>> = stub.run_stub(vec![42; 2]);
         println!("{resp:?}")
     }
 }

@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::TcpClient;
 use crate::error::RMIError;
 use crate::remote::{RMIResult, RemoteRef};
+use crate::stub::{marshal, unmarshal};
 use crate::transport::{RMIRequest, RMIResponse, Transport};
 
 pub trait RemoteTrait: Send + Sync {
@@ -18,7 +19,7 @@ pub trait RemoteTraitTest: Send + Sync {
         arg: A,
     ) -> RMIResult<T>;
 }
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub struct Stub {
     remote: RemoteRef,
 }
@@ -32,20 +33,15 @@ impl Stub {
         Stub { remote }
     }
 
-    pub fn get_ref(self) -> RemoteRef{
+    pub fn get_ref(self) -> RemoteRef {
         self.remote.clone()
     }
 }
 
 impl RemoteTrait for Stub {
     fn run_stub<R: for<'de> Deserialize<'de>, A: Serialize>(&self, arg: A) -> RMIResult<R> {
-        // should marshal args into binary format | serde_cbor cause bincode is deprecated. TODO ask Rob or Badia for alternative
-        // construct an RMI request struct | guess this should also be serialized but maybe in transport layer
-        // use transport to send and get response
-        // unmasrhal result & return
-
         let serialized_args =
-            serde_cbor::to_vec(&arg).map_err(|e| RMIError::SerializationError(e.to_string()))?;
+            marshal(&arg).map_err(|e| RMIError::SerializationError(e.to_string()))?;
 
         let req = RMIRequest {
             object_id: self.remote.id,
@@ -59,8 +55,8 @@ impl RemoteTrait for Stub {
 
         let bytes: Vec<u8> = response.result?;
 
-        let tuple: R = serde_cbor::from_slice(&bytes)
-            .map_err(|e| RMIError::DeserializationError(e.to_string()))?;
+        let tuple: R =
+            unmarshal(&bytes).map_err(|e| RMIError::DeserializationError(e.to_string()))?;
         Ok(tuple)
     }
 }

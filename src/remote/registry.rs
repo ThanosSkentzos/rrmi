@@ -258,10 +258,7 @@ mod tests {
         let port = reg.port;
         let addr = reg.get_addr(port);
         let ip = get_local_ips().expect("Should be able to get ips")[0];
-        assert_eq!(
-            addr,
-            SocketAddr::new(ip, port)
-        )
+        assert_eq!(addr, SocketAddr::new(ip, port))
     }
 
     #[test]

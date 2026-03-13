@@ -71,8 +71,8 @@ impl RemoteTraitTest for Stub {
 }
 
 mod tests {
-    use crate::remote::RMI_ID;
     use super::*;
+    use crate::remote::RMI_ID;
 
     #[test]
     fn different_stub_R_A() {

@@ -142,20 +142,20 @@ mod tests {
     #[test]
     fn local_tcp_test() {
         let recv_handle = thread::spawn(|| {
-            get_int_struct("localhost",LOCAL_GET_SEND);
+            get_int_struct("localhost", LOCAL_GET_SEND);
         });
         thread::sleep(std::time::Duration::from_millis(100));
-        send_int_struct("localhost",LOCAL_GET_SEND);
+        send_int_struct("localhost", LOCAL_GET_SEND);
         recv_handle.join().unwrap();
     }
 
     #[test]
     fn remote_send() {
-        send_int_struct(HOSTNAME_RECV,REMOTE_GET_SEND);
+        send_int_struct(HOSTNAME_RECV, REMOTE_GET_SEND);
     }
     #[test]
     fn remote_recv() {
-        get_int_struct(HOSTNAME_RECV,REMOTE_GET_SEND);
+        get_int_struct(HOSTNAME_RECV, REMOTE_GET_SEND);
     }
 
     fn get_int_struct(hostname: &str, port: u16) {

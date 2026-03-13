@@ -13,7 +13,7 @@ pub fn unmarshal<T: for<'de> Deserialize<'de>>(bytes: &Vec<u8>) -> RMIResult<T> 
 mod tests {
     use super::{marshal, unmarshal};
     use crate::{remote::RMI_ID, transport::RMIRequest};
-    
+
     #[test]
     fn serde_int() {
         let data: i32 = 1;

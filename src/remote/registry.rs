@@ -243,13 +243,14 @@ mod tests {
         stub::{RemoteTrait, Stub, marshal, unmarshal},
     };
     use core::{panic, time};
-    use std::{thread, time::Duration};
+    use std::{io::Read, thread, time::Duration};
     use threadpool::ThreadPool;
 
     static POPUL_PORT: u16 = 10996;
     static BIND_PORT: u16 = 10997;
     static LOCAL_PORT: u16 = 10998;
     static REMOTE_TEST_PORT: u16 = 12345;
+    static REMOTE_TEST_SYNC_PORT: u16 = 54321;
     static REMOTE_HOST: &str = "0065074.student.liacs.nl";
 
     #[test]
@@ -382,9 +383,7 @@ mod tests {
         let reg = create_registry(REMOTE_TEST_PORT);
         let obj_verbose = MockRemoteObject::verbose();
         reg.bind("verbose", obj_verbose);
-        // how to block
-        thread::sleep(Duration::from_secs(5));
-        todo!("receive ok");
+        assert_eq!(sync_receive(REMOTE_TEST_SYNC_PORT), vec![0])
     }
 
     #[test]
@@ -395,6 +394,34 @@ mod tests {
         let stub = reg.lookup("verbose").expect("should work");
         let resp: RMIResult<Vec<u8>> = stub.run_stub(vec![42; 2]);
         println!("{resp:?}");
-        todo!("send ok");
+        sync_send(REMOTE_HOST, REMOTE_TEST_SYNC_PORT);
+    }
+
+    fn ensure_connect(socket: &str) -> TcpStream {
+        let stream: TcpStream;
+        loop {
+            let s = TcpStream::connect(socket);
+            match s {
+                Ok(strm) => {
+                    stream = strm;
+                    break;
+                }
+                Err(e) => continue,
+            }
+        }
+        stream
+    }
+
+    fn sync_receive(port: u16) -> Vec<u8> {
+        let l = TcpListener::bind(format!("0.0.0.0:{}", port)).expect("should be able to get port");
+        let (mut stream, _) = l.accept().expect("send message from skel");
+        receive_data(&mut stream)
+    }
+
+    fn sync_send(host: &str, port: u16) {
+        let socket = format!("{host}:{}", port);
+        let mut stream = ensure_connect(&socket);
+        let data_serial = vec![0];
+        let _ = send_data(data_serial, &mut stream);
     }
 }

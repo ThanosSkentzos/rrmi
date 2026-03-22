@@ -1,5 +1,5 @@
 pub mod registry;
-pub use registry::{RMI_ID, Registry,create_registry};
+pub use registry::{RMI_ID, Registry, create_registry};
 
 use crate::error::RMIError;
 use crate::transport::{IpAddr, SocketAddr};
@@ -44,7 +44,11 @@ impl MockRemoteObject {
 impl RemoteObject for MockRemoteObject {
     fn run(&self, method_name: &str, args: Vec<u8>) -> RMIResult<Vec<u8>> {
         if self.verbose {
-            eprintln!("Remote got {method_name} and {args:?}");
+            eprintln!("Remote got {method_name} and vec: {args:?}");
+            // let result: Vec<u8> =
+            // unmarshal(&args)
+            // .expect("should be able to deserialize");
+            // eprintln!("After deserializing: {result:?}");
         }
         RMIResult::Ok(args)
     }

@@ -116,6 +116,14 @@ impl Registry {
         id
     }
 
+    pub fn unbind(&self) {
+        todo!()
+        // switch variable to unbind
+    }
+}
+
+impl Registry{
+
     pub fn listen(self) -> RMIResult<Arc<Registry>> {
         let socket = SocketAddr::new(
             IpAddr::V4(Ipv4Addr::from_str("0.0.0.0").expect("0.0.0.0 should pass")),
@@ -146,10 +154,6 @@ impl Registry {
         // gracefull shutdown or kill?
     }
 
-    pub fn unbind(&self) {
-        todo!()
-        // switch variable to unbind
-    }
 
     fn handle_connection(&self, mut stream: TcpStream) -> RMIResult<()> {
         let request_bytes = receive_data(&mut stream);

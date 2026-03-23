@@ -14,18 +14,6 @@ impl Skeleton {
     pub fn new(object: Arc<dyn RemoteObject>) -> Self {
         Skeleton { object }
     }
-
-    pub fn handle_request(&self, request: RMIRequest) -> RMIResponse {
-        eprintln!("Skeleton got request {request:?}");
-        match self
-            .object
-            .run(&request.method_name, request.serialized_args)
-        {
-            Ok(result) => RMIResponse::success(result),
-            Err(e) => RMIResponse::error(format!("{e}")),
-        }
-    }
-
     pub fn listen(self: &Arc<Self>) -> RMIResult<u16> {
         let listener = find_available_port_os()?;
         let self_clone = Arc::clone(&self);
@@ -54,6 +42,18 @@ impl Skeleton {
 
         send_data(response_bytes, &mut stream)
     }
+
+    pub fn handle_request(&self, request: RMIRequest) -> RMIResponse {
+        eprintln!("Skeleton got request {request:?}");
+        match self
+            .object
+            .run(&request.method_name, request.serialized_args)
+        {
+            Ok(result) => RMIResponse::success(result),
+            Err(e) => RMIResponse::error(format!("{e}")),
+        }
+    }
+
 }
 
 //#TODO tests

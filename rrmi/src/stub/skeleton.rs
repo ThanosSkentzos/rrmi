@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use crate::error::RMIError;
 use crate::remote::{RMIResult, RemoteObject};
 use crate::stub::{marshal, unmarshal};
 use crate::transport::utils::find_available_port_os;

@@ -1,6 +1,5 @@
 use crate::remote::RMI_ID;
 use serde::{Deserialize, Serialize};
-use std::backtrace::{self, Backtrace};
 use thiserror::Error;
 
 #[derive(Error, Debug, Clone, Serialize, Deserialize, PartialEq)]

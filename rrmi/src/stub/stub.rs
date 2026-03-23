@@ -11,7 +11,7 @@ use crate::transport::{RMIRequest, RMIResponse, Transport};
 pub trait RemoteTrait: Send + Sync {
     fn run_stub<T: for<'de> Deserialize<'de>, A: Serialize>(&self, arg: A) -> RMIResult<T>;
 }
-
+#[allow(dead_code)]
 pub trait RemoteTraitTest: Send + Sync {
     fn run_stub_test<T: for<'de> Deserialize<'de> + Default, A: Serialize + Debug>(
         &self,

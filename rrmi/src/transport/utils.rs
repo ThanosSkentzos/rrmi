@@ -4,9 +4,11 @@ use crate::transport::tcp::{IpAddr, Ipv4Addr, SocketAddr, TcpListener};
 use crate::{error::RMIError, remote::RMIResult};
 use std::str::FromStr;
 
+#[allow(dead_code)]
 static START: u16 = 31768;
+#[allow(dead_code)]
 static END: u16 = 60999;
-
+#[allow(dead_code)]
 pub fn find_available_port_mine() -> RMIResult<(TcpListener, u16)> {
     for port in START..END {
         match TcpListener::bind(("0.0.0.0", port)) {
@@ -51,6 +53,7 @@ pub fn get_local_ips() -> Result<Vec<IpAddr>, ()> {
         .collect();
     Ok(ips)
 }
+#[allow(dead_code)]
 fn get_local_ifs() -> Result<Vec<Interface>, ()> {
     let ifs = if_addrs::get_if_addrs()
         .map_err(|err| {

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::RMIError;
 use crate::remote::{RMIResult, Registry};
 use crate::stub::{marshal, unmarshal};
-use crate::transport::{RMIRequest, RMIResponse, Transport};
+use crate::transport::{RMIRequest, Transport};
 
 pub fn send_data(data_serial: Vec<u8>, stream: &mut TcpStream) -> RMIResult<()> {
     let len = data_serial.len() as u32;
@@ -64,10 +64,11 @@ impl Transport for TcpClient {
         Ok(response)
     }
 }
+#[allow(dead_code)]
 pub struct TcpServer {
     registry: Arc<Registry>, // resource count cause might be used by multiple
 }
-
+#[allow(dead_code)]
 impl TcpServer {
     pub fn new(registry: Arc<Registry>) -> Self {
         TcpServer { registry }
@@ -106,7 +107,7 @@ impl TcpServer {
         );
 
         let object = self.registry.get(&request.object_id)?;
-        let response: RMIResult<()> = todo!();
+        let response: RMIResult<()> = todo!("work with");
         // let response = self.skeleton.handle_request(request, object.as_ref());
 
         let response_bytes = marshal(&response)?;

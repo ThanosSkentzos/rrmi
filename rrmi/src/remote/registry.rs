@@ -1,3 +1,4 @@
+#[allow(non_camel_case_types)]
 pub type RMI_ID = usize;
 use super::{RMIResult, RemoteObject, RemoteRef};
 use crate::error::RMIError;
@@ -31,6 +32,7 @@ impl Registry {
         }
     }
 
+    #[allow(dead_code)]
     fn default() -> Registry {
         Registry::new(1099)
     }
@@ -59,7 +61,7 @@ impl Registry {
         // eprintln!("removed: now strong, weak = {strong},{weak} remaining: {left}");
         Ok(())
     }
-
+    #[allow(dead_code)]
     fn remove_log(&self, name: &str) -> RMIResult<()> {
         eprintln!("removing {name}");
         self.remove(name)
@@ -86,6 +88,7 @@ impl Registry {
         Ok(RemoteRef { addr, id: *id })
     }
 
+    #[allow(dead_code)]
     fn lookup_log(&self, name: &str) -> RMIResult<RemoteRef> {
         let res = self.lookup(name);
         match res.clone() {
@@ -197,6 +200,7 @@ impl RegistryStub {
         }
     }
 
+    #[allow(dead_code)]
     fn lookup_log(&self, name: &str) -> RMIResult<Stub> {
         let res = self.lookup(name);
         match res.clone() {
@@ -325,8 +329,8 @@ mod tests {
         reg.bind("verbose", verbose);
         reg.bind("silent", silent);
 
-        let remote = reg.lookup_log("silent").expect("silent should be in");
-        let remote = reg.lookup_log("verbose").expect("verbose should be in");
+        let _remote = reg.lookup_log("silent").expect("silent should be in");
+        let _remote = reg.lookup_log("verbose").expect("verbose should be in");
 
         let l = reg.list().expect("two already in");
         let l_rmt = rmt_reg.list().expect("same");

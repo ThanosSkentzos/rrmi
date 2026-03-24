@@ -1,5 +1,5 @@
 [package]
-name = "rrmi-macros"
+name = "rrmi_macros"
 version = "0.1.0"
 edition = "2024"
 

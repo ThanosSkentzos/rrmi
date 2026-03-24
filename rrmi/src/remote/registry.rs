@@ -21,7 +21,6 @@ pub struct Registry {
     names: Arc<Mutex<HashMap<String, RMI_ID>>>,
     next_id: Arc<AtomicUsize>,
 }
-
 impl Registry {
     fn new(port: u16) -> Self {
         Registry {
@@ -43,7 +42,6 @@ impl Registry {
         let ip = ips[0]; //use 1st for now TODO handle eth or ib
         SocketAddr::new(ip, port)
     }
-
     fn remove(&self, name: &str) -> RMIResult<()> {
         let mut names = self.names.lock().unwrap();
         let id = names
@@ -100,7 +98,6 @@ impl Registry {
         }
         res
     }
-
     pub fn list(&self) -> RMIResult<Vec<String>> {
         let names: Vec<String> = self.names.lock().unwrap().keys().cloned().collect();
         match names.len() {
@@ -125,8 +122,7 @@ impl Registry {
     }
 }
 
-impl Registry{
-
+impl Registry {
     pub fn listen(self) -> RMIResult<Arc<Registry>> {
         let socket = SocketAddr::new(
             IpAddr::V4(Ipv4Addr::from_str("0.0.0.0").expect("0.0.0.0 should pass")),
@@ -156,7 +152,6 @@ impl Registry{
         // check variable to unbind
         // gracefull shutdown or kill?
     }
-
 
     fn handle_connection(&self, mut stream: TcpStream) -> RMIResult<()> {
         let request_bytes = receive_data(&mut stream);

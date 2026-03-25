@@ -2,11 +2,9 @@
 pub type RMI_ID = usize;
 use super::{RMIResult, RemoteObject, RemoteRef};
 use crate::error::RMIError;
-use crate::stub::{Skeleton, Stub, marshal, unmarshal};
+use crate::stub::{Skeleton, Stub};
 use crate::transport::utils::{get_addr, get_local_ips};
-use crate::transport::{
-    IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream, receive_data, send_data,
-};
+use crate::transport::{IpAddr, Ipv4Addr, SocketAddr, TcpListener};
 use crate::transport::{TcpClient, Transport};
 
 use rrmi_macros::remote_object;
@@ -168,15 +166,15 @@ impl Registry {
         // gracefull shutdown or kill?
     }
 
-    fn handle_connection(&self, mut stream: TcpStream) -> RMIResult<()> {
-        let request_bytes = receive_data(&mut stream);
-        let request: RegistryRequest = unmarshal(&request_bytes)?;
+    // fn handle_connection(&self, mut stream: TcpStream) -> RMIResult<()> {
+    //     let request_bytes = receive_data(&mut stream);
+    //     let request: RegistryRequest = unmarshal(&request_bytes)?;
 
-        let response: RegistryResponse = self.handle_request(request);
+    //     let response: RegistryResponse = self.handle_request(request);
 
-        let response_bytes = marshal(&response)?;
-        send_data(response_bytes, &mut stream)
-    }
+    //     let response_bytes = marshal(&response)?;
+    //     send_data(response_bytes, &mut stream)
+    // }
 
     // fn handle_request(&self, req: RegistryRequest) -> RegistryResponse {
     //     match req {
@@ -246,10 +244,13 @@ pub fn get_registry(host: &str, port: u16) -> RegistryStub {
 mod tests {
     use super::*;
     use crate::{
+        receive_data,
         remote::MockRemoteObject,
+        send_data,
         stub::{RemoteTrait, Stub, marshal, unmarshal},
     };
     use core::{panic, time};
+    use std::net::TcpStream;
     #[allow(unused_imports)]
     use std::{io::Read, thread, time::Duration};
     use threadpool::ThreadPool;

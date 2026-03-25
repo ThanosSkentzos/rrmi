@@ -12,7 +12,20 @@ pub fn gen_listen(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
 }
 
 pub fn gen_handle_connection(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
-    quote! {}
+    let struct_name = &remote_obj.struct_name.0;
+    let req_name = Ident::new(&format!("{struct_name}Request"), Span::call_site());
+    let res_name = Ident::new(&format!("{struct_name}Response"), Span::call_site());
+    quote! {
+        fn handle_connection(&self, mut stream: ::std::net::TcpStream) -> ::rrmi::RMIResult<()> {
+            let request_bytes = ::rrmi::receive_data(&mut stream);
+            let request: #req_name = ::rrmi::unmarshal(&request_bytes)?;
+
+            let response: #res_name = self.handle_request(request);
+
+            let response_bytes = ::rrmi::marshal(&response)?;
+            ::rrmi::send_data(response_bytes, &mut stream)
+    }
+    }
 }
 
 pub fn gen_handle_request(remote_obj: &RemoteObjectInfo) -> TokenStream2 {

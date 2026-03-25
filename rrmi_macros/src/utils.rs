@@ -24,7 +24,7 @@ pub fn normalize_type(ty: &Type) -> Type {
     }
     ty.clone()
 }
-
+#[allow(unused)]
 pub fn already_rmi_result(ty: &Type) -> bool {
     // take the type and check if is already ::foo::bar::RMIResult<T>
     if let Type::Path(tp) = ty {
@@ -32,6 +32,15 @@ pub fn already_rmi_result(ty: &Type) -> bool {
             if last.ident == "RMIResult" {
                 return true;
             }
+        }
+    }
+    false
+}
+
+pub fn is_str_ref(ty: &Type) -> bool {
+    if let Type::Reference(r) = ty {
+        if let Type::Path(p) = r.elem.as_ref() {
+            return p.path.is_ident("str");
         }
     }
     false

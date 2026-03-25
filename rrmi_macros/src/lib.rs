@@ -1,15 +1,14 @@
+mod generators;
 mod structure;
 mod utils;
 
-use proc_macro::TokenStream;
-use proc_macro2::{Span, TokenStream as TokenStream2};
-use quote::quote;
-use syn::{Ident, ItemImpl, ReturnType};
-
 use crate::{
+    generators::{gen_enums, gen_handle_connection, gen_handle_request, gen_listen},
     structure::RemoteObjectInfo,
-    utils::{already_rmi_result, fix_case, normalize_type},
 };
+use proc_macro::TokenStream;
+use quote::quote;
+use syn::ItemImpl;
 
 #[proc_macro_attribute]
 pub fn remote_object(_attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -20,75 +19,21 @@ pub fn remote_object(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let debug_msg = format!("{remote_obj:?}");
     let _err = syn::Error::new_spanned(&remote_obj.struct_name.0, debug_msg).to_compile_error();
+
+    let struct_name = &remote_obj.struct_name.0;
     let enums = gen_enums(&remote_obj);
+    let handle_request = gen_handle_request(&remote_obj);
+    let handle_connection = gen_handle_connection(&remote_obj);
+    let listen = gen_listen(&remote_obj);
     quote! {
         // #err
         #input
         #enums
+        impl #struct_name{
+            #handle_request
+            #handle_connection
+            #listen
+        }
     }
     .into()
-}
-
-fn gen_enums(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
-    let struct_name = remote_obj.struct_name.0.clone();
-    let req_name = Ident::new(&format!("{struct_name}Request"), Span::call_site());
-    let res_name = Ident::new(&format!("{struct_name}Response"), Span::call_site());
-    let req_variants = remote_obj
-        .methods
-        .iter()
-        .map(|m| {
-            let enum_variant = Ident::new(&fix_case(&m.name.to_string()), m.name.span());
-            let fields = m.params.0.iter().map(|p| {
-                let (field_name, field_type) = &p.0;
-                let field_type = normalize_type(field_type);
-                quote! {#field_name: #field_type }
-            });
-            if m.params.0.is_empty() {
-                quote! { #enum_variant } // like List,
-            } else {
-                quote! { #enum_variant { #(#fields),*}} // like Lookup(String)
-            }
-        })
-        .collect::<Vec<_>>();
-    let res_variants = remote_obj.methods.iter().map(|m| {
-        let enum_variant = Ident::new(&fix_case(&m.name.to_string()), m.name.span());
-        let ret = match &m.ret {
-            ReturnType::Default => syn::parse_quote!(()),
-            ReturnType::Type(_, ty) => *ty.clone(),
-        };
-        if already_rmi_result(&ret) {
-            quote! { #enum_variant(#ret)}
-        } else {
-            quote! { #enum_variant(::rrmi::RMIResult<#ret>)}
-        }
-    });
-
-    let import_rmiresult = quote! {use rrmi::RMIResult;};
-    let enums = quote! {
-        #[derive(serde::Serialize,serde::Deserialize)]
-        pub enum #req_name{
-            #(#req_variants),*
-        }
-
-        #[derive(serde::Serialize,serde::Deserialize)]
-        pub enum #res_name{
-            #(#res_variants),*
-        }
-    };
-    if struct_name == "Registry" {
-        let _err = syn::Error::new_spanned(
-            struct_name,
-            "Registry is used internallyin rrmi, please use another name.",
-        )
-        .to_compile_error();
-        quote! {
-            // #_err
-            #enums
-        }
-    } else {
-        quote! {
-            #import_rmiresult
-            #enums
-        }
-    }
 }

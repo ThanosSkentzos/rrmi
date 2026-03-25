@@ -5,6 +5,8 @@ use syn::{
     punctuated::Punctuated,
 };
 
+use crate::utils::fix_case;
+
 pub struct RemoteObjectInfo {
     pub struct_name: StructNameInfo,
     pub methods: Vec<RemoteMethodInfo>,
@@ -72,6 +74,20 @@ pub struct RemoteMethodInfo {
     pub name: Ident,
     pub params: ParametersInfo,
     pub ret: ReturnType,
+}
+
+impl RemoteMethodInfo {
+    pub fn get_name_fixed(&self) -> Ident {
+        let name = &self.name;
+        Ident::new(&fix_case(&name.to_string()), name.span().clone())
+    }
+
+    pub fn get_ret(&self) -> Type {
+        match &self.ret {
+            ReturnType::Default => syn::parse_quote!(()),
+            ReturnType::Type(_, ty) => *ty.clone(),
+        }
+    }
 }
 
 impl TryFrom<&mut ImplItemFn> for RemoteMethodInfo {

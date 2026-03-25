@@ -106,18 +106,17 @@ impl TcpServer {
             request.object_id, request.method_name
         );
 
-        let object = self.registry.get(&request.object_id)?;
-        let response: RMIResult<()> = todo!("work with");
+        let _object = self.registry.get(&request.object_id)?;
+        let _response: RMIResult<()> = todo!("work with");
         // let response = self.skeleton.handle_request(request, object.as_ref());
-
-        let response_bytes = marshal(&response)?;
+        #[allow(unreachable_code)]
+        let response_bytes = marshal(&_response)?;
         send_data(response_bytes, &mut stream)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use core::time;
     use std::thread;
 
     use super::*;

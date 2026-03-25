@@ -9,6 +9,7 @@ use crate::transport::{
 };
 use crate::transport::{TcpClient, Transport};
 
+use rrmi_macros::remote_object;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -21,6 +22,7 @@ pub struct Registry {
     names: Arc<Mutex<HashMap<String, RMI_ID>>>,
     next_id: Arc<AtomicUsize>,
 }
+#[remote_object]
 impl Registry {
     fn new(port: u16) -> Self {
         Registry {
@@ -73,7 +75,7 @@ impl Registry {
             .cloned()
             .ok_or(RMIError::ObjectNotFound(*id))
     }
-
+    #[remote]
     fn lookup(&self, name: &str) -> RMIResult<RemoteRef> {
         //! name -> remote ref | for client
         let names = self.names.lock().unwrap();
@@ -98,6 +100,8 @@ impl Registry {
         }
         res
     }
+
+    #[remote]
     pub fn list(&self) -> RMIResult<Vec<String>> {
         let names: Vec<String> = self.names.lock().unwrap().keys().cloned().collect();
         match names.len() {
@@ -165,7 +169,7 @@ impl Registry {
 
     fn handle_request(&self, req: RegistryRequest) -> RegistryResponse {
         match req {
-            RegistryRequest::Lookup(name) => RegistryResponse::Lookup(self.lookup(&name)),
+            RegistryRequest::Lookup { name } => RegistryResponse::Lookup(self.lookup(&name)),
             RegistryRequest::List => RegistryResponse::List(self.list()),
         }
     }
@@ -187,7 +191,9 @@ impl RegistryStub {
 
     pub fn lookup(&self, name: &str) -> RMIResult<Stub> {
         let transport = TcpClient::new(self.remote.addr);
-        let req = RegistryRequest::Lookup(name.to_string());
+        let req = RegistryRequest::Lookup {
+            name: name.to_string(),
+        };
         let resp: RegistryResponse = transport.send(req)?;
         match resp {
             RegistryResponse::Lookup(Ok(res)) => Ok(Stub::new(res)),
@@ -226,17 +232,17 @@ pub fn get_registry(host: &str, port: u16) -> RegistryStub {
     // todo!("to do this I need to ask the registry for its reference and treat it like a skeleton")
 }
 
-#[derive(Serialize, Deserialize)]
-pub enum RegistryRequest {
-    Lookup(String),
-    List,
-}
+// #[derive(Serialize, Deserialize)]
+// pub enum RegistryRequest {
+//     Lookup(String),
+//     List,
+// }
 
-#[derive(Serialize, Deserialize)]
-pub enum RegistryResponse {
-    Lookup(RMIResult<RemoteRef>),
-    List(RMIResult<Vec<String>>),
-}
+// #[derive(Serialize, Deserialize)]
+// pub enum RegistryResponse {
+//     Lookup(RMIResult<RemoteRef>),
+//     List(RMIResult<Vec<String>>),
+// }
 
 #[cfg(test)]
 mod tests {

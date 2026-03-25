@@ -10,7 +10,6 @@ use crate::transport::{
 use crate::transport::{TcpClient, Transport};
 
 use rrmi_macros::remote_object;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -126,6 +125,18 @@ impl Registry {
     }
 }
 
+// #[derive(Serialize, Deserialize)]
+// pub enum RegistryRequest {
+//     Lookup(String),
+//     List,
+// }
+
+// #[derive(Serialize, Deserialize)]
+// pub enum RegistryResponse {
+//     Lookup(RMIResult<RemoteRef>),
+//     List(RMIResult<Vec<String>>),
+// }
+
 impl Registry {
     pub fn listen(self) -> RMIResult<Arc<Registry>> {
         let socket = SocketAddr::new(
@@ -167,12 +178,12 @@ impl Registry {
         send_data(response_bytes, &mut stream)
     }
 
-    fn handle_request(&self, req: RegistryRequest) -> RegistryResponse {
-        match req {
-            RegistryRequest::Lookup { name } => RegistryResponse::Lookup(self.lookup(&name)),
-            RegistryRequest::List => RegistryResponse::List(self.list()),
-        }
-    }
+    // fn handle_request(&self, req: RegistryRequest) -> RegistryResponse {
+    //     match req {
+    //         RegistryRequest::Lookup { name } => RegistryResponse::Lookup(self.lookup(&name)),
+    //         RegistryRequest::List => RegistryResponse::List(self.list()),
+    //     }
+    // }
 }
 
 pub fn create_registry(port: u16) -> Arc<Registry> {
@@ -231,19 +242,6 @@ pub fn get_registry(host: &str, port: u16) -> RegistryStub {
     RegistryStub::new(remote_ref_ref)
     // todo!("to do this I need to ask the registry for its reference and treat it like a skeleton")
 }
-
-// #[derive(Serialize, Deserialize)]
-// pub enum RegistryRequest {
-//     Lookup(String),
-//     List,
-// }
-
-// #[derive(Serialize, Deserialize)]
-// pub enum RegistryResponse {
-//     Lookup(RMIResult<RemoteRef>),
-//     List(RMIResult<Vec<String>>),
-// }
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -252,6 +250,7 @@ mod tests {
         stub::{RemoteTrait, Stub, marshal, unmarshal},
     };
     use core::{panic, time};
+    #[allow(unused_imports)]
     use std::{io::Read, thread, time::Duration};
     use threadpool::ThreadPool;
 
@@ -415,7 +414,7 @@ mod tests {
                     stream = strm;
                     break;
                 }
-                Err(e) => continue,
+                Err(_e) => continue,
             }
         }
         stream

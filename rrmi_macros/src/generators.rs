@@ -49,7 +49,7 @@ pub fn gen_handle_request(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
     });
 
     quote! {
-        fn handle_request_gen(&self, req: #req_name) -> #res_name{
+        fn handle_request(&self, req: #req_name) -> #res_name{
             match req{
                 #(#match_arms),*
             }

@@ -53,7 +53,6 @@ impl Skeleton {
             Err(e) => RMIResponse::error(format!("{e}")),
         }
     }
-
 }
 
 //#TODO tests

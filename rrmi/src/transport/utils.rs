@@ -84,10 +84,10 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .expect("should be able to get time");
         let s = Instant::now();
-        let (t, p) = find_available_port_mine().expect("should have available ports");
+        let (t, _p) = find_available_port_mine().expect("should have available ports");
         let mut a = vec![t];
         for _ in 1..TOTAL {
-            let (t, p) = find_available_port_mine().expect("should have available ports");
+            let (t, _p) = find_available_port_mine().expect("should have available ports");
             // eprintln!("{p:?}");
             a.push(t);
         }

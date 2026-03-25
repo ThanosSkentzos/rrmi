@@ -122,7 +122,6 @@ mod tests {
     use super::*;
     use crate::utils::get_addr;
     static HOSTNAME_RECV: &str = "0065074.student.liacs.nl";
-    static REMOTE_TEST_PORT: u16 = 12345;
     static LOCAL_GET_SEND: u16 = 10999;
     static REMOTE_GET_SEND: u16 = 11000;
 

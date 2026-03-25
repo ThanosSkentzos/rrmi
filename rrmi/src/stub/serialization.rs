@@ -27,6 +27,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(non_snake_case)]
     fn serde_RMIRequest() {
         let object_id: RMI_ID = 1;
         let method_handler: String = String::from("this is a test");

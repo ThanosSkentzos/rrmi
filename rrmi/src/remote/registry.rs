@@ -378,7 +378,7 @@ mod tests {
         reg.bind("second", obj2);
         let rmt2 = reg.lookup_log("second").expect("second should be in");
         let stb2 = Stub::new(rmt2);
-
+        #[allow(noop_method_call)]
         let res2: RMIResult<String> = stb2.run_stub(args2.clone());
         eprintln!("result: {res2:?} matched expected\n\n");
         assert_eq!(res2.unwrap(), res2_expected);

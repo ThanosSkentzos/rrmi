@@ -91,6 +91,7 @@ mod tests {
         let res2: i32 = s1.run_stub_test(arg1).unwrap();
         let res3: String = s1.run_stub_test((arg1, arg2.clone())).unwrap();
         let res4: () = s1.run_stub_test(()).unwrap();
+        #[allow(unused_parens)]
         let res5: RMIRequest = s1.run_stub_test(("this is a test")).unwrap();
         let res6: () = s1.run_stub_test(RMIRequest::default()).unwrap();
         let res7: (RMIRequest, RMI_ID, i32) =
@@ -104,7 +105,6 @@ mod tests {
         let t5 = type_name_of_val(&res5);
         let t6 = type_name_of_val(&res6);
         let t7 = type_name_of_val(&res7);
-
 
         assert_ne!(t0, t1);
         assert_ne!(t1, t2);

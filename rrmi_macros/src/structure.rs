@@ -2,6 +2,7 @@ use quote::quote;
 use std::fmt::Debug;
 use syn::{
     FnArg, Ident, ImplItem, ImplItemFn, ItemImpl, Meta, Pat, ReturnType, Token, Type,
+    parse::{Parse, ParseStream},
     punctuated::Punctuated,
 };
 
@@ -10,29 +11,62 @@ use crate::utils::fix_case;
 pub struct RemoteObjectInfo {
     pub struct_name: StructNameInfo,
     pub methods: Vec<RemoteMethodInfo>,
+    pub original: ItemImpl,
 }
 
-impl TryFrom<&mut ItemImpl> for RemoteObjectInfo {
-    type Error = ();
-    fn try_from(impl_block: &mut ItemImpl) -> Result<Self, ()> {
-        let struct_name = StructNameInfo::try_from(impl_block.self_ty.as_ref())?;
+impl Parse for RemoteObjectInfo {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut impl_block: ItemImpl = input.parse()?;
+        let struct_name = StructNameInfo::try_from(impl_block.self_ty.as_ref()).map_err(|_| {
+            syn::Error::new_spanned(
+                &impl_block.self_ty,
+                "remote_object: expected a plain struct name",
+            )
+        })?;
         let methods: Vec<RemoteMethodInfo> = impl_block
             .items
             .iter_mut()
             .filter_map(|x| {
                 match x {
-                    ImplItem::Fn(method) => RemoteMethodInfo::try_from(method),
-                    _ => Err(()),
+                    ImplItem::Fn(method) => RemoteMethodInfo::try_from(&mut *method)
+                        .map_err(|_| syn::Error::new_spanned(method, "Problem parsing function")),
+                    _ => Err(syn::Error::new_spanned(x, "Could not parse as a function")),
                 }
                 .ok()
             })
             .collect();
+        let original = impl_block.clone(); // clone after cleaning the methods
         Ok(Self {
             struct_name,
             methods,
+            original,
         })
     }
 }
+
+// impl TryFrom<&mut ItemImpl> for RemoteObjectInfo {
+//     type Error = ();
+//     fn try_from(impl_block: &mut ItemImpl) -> Result<Self, ()> {
+//         let struct_name = StructNameInfo::try_from(impl_block.self_ty.as_ref())?;
+//         let methods: Vec<RemoteMethodInfo> = impl_block
+//             .items
+//             .iter_mut()
+//             .filter_map(|x| {
+//                 match x {
+//                     ImplItem::Fn(method) => RemoteMethodInfo::try_from(method),
+//                     _ => Err(()),
+//                 }
+//                 .ok()
+//             })
+//             .collect();
+//         let original = impl_block.clone();
+//         Ok(Self {
+//             struct_name,
+//             methods,
+//             original,
+//         })
+//     }
+// }
 impl Debug for RemoteObjectInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let methods = self

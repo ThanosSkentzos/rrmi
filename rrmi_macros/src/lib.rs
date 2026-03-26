@@ -8,15 +8,12 @@ use crate::{
 };
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::ItemImpl;
+use syn::parse_macro_input;
 
 #[proc_macro_attribute]
 pub fn remote_object(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    let mut input = syn::parse::<ItemImpl>(item.clone())
-        .expect("remote_object should be used at an impl block");
-    let remote_obj =
-        RemoteObjectInfo::try_from(&mut input).expect("remote_object: failed to parse");
-
+    let remote_obj = parse_macro_input!(item as RemoteObjectInfo);
+    let original = &remote_obj.original;
     let debug_msg = format!("{remote_obj:?}");
     let _err = syn::Error::new_spanned(&remote_obj.struct_name.0, debug_msg).to_compile_error();
 
@@ -26,8 +23,8 @@ pub fn remote_object(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let handle_connection = gen_handle_connection(&remote_obj);
     let listen = gen_listen(&remote_obj);
     quote! {
-        // #err
-        #input
+        // #_err
+        #original
         #enums
         impl #struct_name{
             #handle_request

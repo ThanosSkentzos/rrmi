@@ -7,7 +7,7 @@ use crate::{
     utils::{is_str_ref, normalize_type},
 };
 
-pub fn gen_listen(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
+pub fn gen_listen(_remote_obj: &RemoteObjectInfo) -> TokenStream2 {
     quote! {}
 }
 

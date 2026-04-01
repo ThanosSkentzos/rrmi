@@ -1,11 +1,85 @@
-use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::quote;
 use syn::Ident;
 
 use crate::{
-    RemoteObjectInfo,
-    utils::{is_str_ref, normalize_type},
+    RemoteObjectInfo, Span, TokenStream2,
+    utils::{already_rmi_result, fix_ref_to_type, fix_ref_when_called, is_str_ref},
 };
+
+pub fn gen_stub(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
+    let struct_name = &remote_obj.struct_name.0;
+    let (req_name, res_name) = remote_obj.get_enum_names();
+    let stub_name = Ident::new(&format!("{struct_name}Stub"), Span::call_site());
+    let functions = remote_obj.methods.iter().map(|m| {
+        let method_name = m.name.clone();
+        let camel = m.get_name_camel();
+        let params = &m.params.0;
+        let param_name_types = params.iter().map(|p| {
+            let name = &p.0.0;
+            let ty = &p.0.1;
+            quote! { #name: #ty}
+        }); // iterator over a:i32 , b:i32, c: &str
+
+        let mut ret = m.get_ret();
+        let mut pattern = quote! {#res_name::#camel(res)};
+        let mut expr = quote! {Ok(res)};
+
+        if struct_name == "Registry" {
+            pattern = quote! {#res_name::#camel(Ok(res))};
+            if method_name == "lookup" {
+                expr = quote! {Ok(::rrmi::Stub::new(res))};
+                ret = syn::parse_quote!(::rrmi::Stub);
+            }
+        }
+
+        let ret = if already_rmi_result(&ret) {
+            quote! {#ret}
+        } else {
+            quote! {::rrmi::RMIResult<#ret>}
+        };
+        let param_names = params.iter().map(|p| fix_ref_when_called(&p.0));
+
+        let fn_contents = quote! {
+            let transport_client= ::rrmi::TcpClient::new(self.remote.addr);
+            let req = #req_name::#camel{
+                #(#param_names),*
+            };
+            let resp : #res_name = transport_client.send(req)?;
+            match resp{
+                #pattern => #expr,
+                _ => Err(::rrmi::RMIError::TransportError("Wrong response".to_string())),
+            }
+        };
+
+        let fn_call = if params.is_empty() {
+            quote! {pub fn #method_name(&self) -> #ret{
+                #fn_contents
+            } }
+        } else {
+            quote! {pub fn #method_name(&self, #(#param_name_types),* ) -> #ret{
+                #fn_contents
+            } }
+        };
+        quote! {#fn_call}
+        // quote! {fn #method_name()->(){}}
+    });
+    let import_transport = quote! {use ::rrmi::Transport;};
+
+    quote! {
+        pub struct #stub_name{
+            remote: ::rrmi::RemoteRef
+        }
+        #import_transport
+        impl #stub_name{
+            pub fn new(remote: ::rrmi::RemoteRef) -> Self{
+                Self{remote}
+            }
+
+        #(#functions)*
+
+        }
+    }
+}
 
 pub fn gen_listen(_remote_obj: &RemoteObjectInfo) -> TokenStream2 {
     let struct_name = &_remote_obj.struct_name.0;
@@ -48,9 +122,7 @@ pub fn gen_listen(_remote_obj: &RemoteObjectInfo) -> TokenStream2 {
 }
 
 pub fn gen_handle_connection(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
-    let struct_name = &remote_obj.struct_name.0;
-    let req_name = Ident::new(&format!("{struct_name}Request"), Span::call_site());
-    let res_name = Ident::new(&format!("{struct_name}Response"), Span::call_site());
+    let (req_name, res_name) = remote_obj.get_enum_names();
     quote! {
         fn handle_connection(&self, mut stream: ::std::net::TcpStream) -> ::rrmi::RMIResult<()> {
             let request_bytes = ::rrmi::receive_data(&mut stream);
@@ -65,22 +137,16 @@ pub fn gen_handle_connection(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
 }
 
 pub fn gen_handle_request(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
-    let struct_name = remote_obj.struct_name.0.clone();
-    let req_name = Ident::new(&format!("{struct_name}Request"), Span::call_site());
-    let res_name = Ident::new(&format!("{struct_name}Response"), Span::call_site());
-
+    let (req_name, res_name) = remote_obj.get_enum_names();
     let match_arms = remote_obj.methods.iter().map(|m| {
         let method_name = &m.name;
-        let variant = m.get_name_fixed();
+        let camel = m.get_name_camel();
         let params = &m.params.0;
         let (pattern, call) = if params.is_empty() {
-            (
-                quote! { #req_name::#variant },
-                quote! { self.#method_name() },
-            )
+            (quote! { #req_name::#camel }, quote! { self.#method_name() })
         } else {
             let param_names = params.iter().map(|p| &p.0.0);
-            let param_names_2 = params.iter().map(|p| {
+            let param_names_with_ref = params.iter().map(|p| {
                 let name = &p.0.0;
                 let ty = &p.0.1;
                 if is_str_ref(ty) {
@@ -90,11 +156,11 @@ pub fn gen_handle_request(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
                 }
             });
             (
-                quote! {#req_name::#variant { #(#param_names),*}},
-                quote! {self.#method_name(#(#param_names_2),*)},
+                quote! {#req_name::#camel { #(#param_names),*}},
+                quote! {self.#method_name(#(#param_names_with_ref),*)},
             )
         };
-        quote! { #pattern => #res_name::#variant(#call)}
+        quote! { #pattern => #res_name::#camel(#call)}
     });
 
     quote! {
@@ -107,21 +173,19 @@ pub fn gen_handle_request(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
 }
 
 pub fn gen_enums(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
-    let struct_name = remote_obj.struct_name.0.clone();
-    let req_name = Ident::new(&format!("{struct_name}Request"), Span::call_site());
-    let res_name = Ident::new(&format!("{struct_name}Response"), Span::call_site());
+    let (req_name, res_name) = remote_obj.get_enum_names();
     let req_variants = remote_obj
         .methods
         .iter()
         .map(|m| {
-            let enum_variant = m.get_name_fixed();
+            let enum_variant = m.get_name_camel();
             let params = &m.params.0;
             if params.is_empty() {
                 quote! { #enum_variant} // like List,
             } else {
                 let fields = params.iter().map(|param| {
                     let (field_name, field_type) = &param.0;
-                    let norm_type = normalize_type(field_type);
+                    let norm_type = fix_ref_to_type(field_type);
                     quote! {#field_name: #norm_type }
                 });
                 quote! { #enum_variant { #(#fields),*}} // like Lookup{name:String},
@@ -130,7 +194,7 @@ pub fn gen_enums(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
         .collect::<Vec<_>>();
 
     let res_variants = remote_obj.methods.iter().map(|m| {
-        let enum_variant = m.get_name_fixed();
+        let enum_variant = m.get_name_camel();
         let ret = m.get_ret();
         // if already_rmi_result(&ret) {
         //     quote! { #enum_variant(#ret)}
@@ -140,7 +204,7 @@ pub fn gen_enums(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
         quote! { #enum_variant(#ret)}
     });
 
-    let import_rmiresult = quote! {use rrmi::RMIResult;};
+    let import_rmiresult = quote! {use ::rrmi::RMIResult;};
     let enums = quote! {
         #[derive(serde::Serialize,serde::Deserialize)]
         pub enum #req_name{
@@ -153,14 +217,8 @@ pub fn gen_enums(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
         }
     };
 
-    if struct_name == "Registry" {
-        quote! {
-            #enums
-        }
-    } else {
-        quote! {
-            #import_rmiresult
-            #enums
-        }
+    quote! {
+        #import_rmiresult
+        #enums
     }
 }

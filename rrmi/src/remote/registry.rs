@@ -1,11 +1,10 @@
 #[allow(non_camel_case_types)]
 pub type RMI_ID = usize;
-use super::{RMIResult, RemoteObject, RemoteRef};
+use super::{RemoteObject, RemoteRef};
 use crate::error::RMIError;
-use crate::stub::{Skeleton, Stub};
+use crate::stub::Skeleton;
 use crate::transport::SocketAddr;
 use crate::transport::utils::{get_addr, get_local_ips};
-use crate::transport::{TcpClient, Transport};
 
 use rrmi_macros::remote_object;
 use std::collections::HashMap;
@@ -187,49 +186,50 @@ pub fn create_registry(port: u16) -> Arc<Registry> {
     reg
 }
 
-pub struct RegistryStub {
-    remote: RemoteRef,
-}
-impl RegistryStub {
-    pub fn new(remote: RemoteRef) -> Self {
-        RegistryStub { remote }
-    }
+// pub struct RegistryStub {
+//     remote: RemoteRef,
+// }
+// impl RegistryStub {
+//     pub fn new(remote: RemoteRef) -> Self {
+//         RegistryStub { remote }
+//     }
 
-    pub fn lookup(&self, name: &str) -> RMIResult<Stub> {
-        let transport = TcpClient::new(self.remote.addr);
-        let req = RegistryRequest::Lookup {
-            name: name.to_string(),
-        };
-        let resp: RegistryResponse = transport.send(req)?;
-        match resp {
-            RegistryResponse::Lookup(Ok(res)) => Ok(Stub::new(res)),
-            _ => Err(RMIError::TransportError("Wrong response".to_string())),
-        }
-    }
+//     pub fn lookup(&self, name: &str) -> RMIResult<Stub> {
+//         let transport = TcpClient::new(self.remote.addr);
+//         let req = RegistryRequest::Lookup {
+//             name: name.to_string(),
+//         };
+//         let resp: RegistryResponse = transport.send(req)?;
+//         match resp {
+//             RegistryResponse::Lookup(Ok(res)) => Ok(Stub::new(res)),
+//             _ => Err(RMIError::TransportError("Wrong response".to_string())),
+//         }
+//     }
+//     pub fn list(&self) -> RMIResult<Vec<String>> {
+//         let transport = TcpClient::new(self.remote.addr);
+//         let req = RegistryRequest::List {};
+//         let resp: RegistryResponse = transport.send(req)?;
+//         match resp {
+//             RegistryResponse::List(res) => res,
+//             _ => Err(RMIError::TransportError("Wrong response".to_string())),
+//         }
+//     }
+// }
 
-    #[allow(dead_code)]
-    fn lookup_log(&self, name: &str) -> RMIResult<Stub> {
-        let res = self.lookup(name);
-        match res.clone() {
-            Ok(stub) => eprintln!(
-                "RegistryStub returned stub for skeleton listening at {:?}",
-                stub.get_ref()
-            ),
-            Err(_) => (),
-        }
-        res
-    }
-
-    pub fn list(&self) -> RMIResult<Vec<String>> {
-        let transport = TcpClient::new(self.remote.addr);
-        let req = RegistryRequest::List {};
-        let resp: RegistryResponse = transport.send(req)?;
-        match resp {
-            RegistryResponse::List(res) => res,
-            _ => Err(RMIError::TransportError("Wrong response".to_string())),
-        }
-    }
-}
+// impl RegistryStub{
+//     #[allow(dead_code)]
+//     fn lookup_log(&self, name: &str) -> RMIResult<Stub> {
+//         let res = self.lookup(name);
+//         match res.clone() {
+//             Ok(stub) => eprintln!(
+//                 "RegistryStub returned stub for skeleton listening at {:?}",
+//                 stub.get_ref()
+//             ),
+//             Err(_) => (),
+//         }
+//         res
+//     }
+// }
 
 pub fn get_registry(host: &str, port: u16) -> RegistryStub {
     let addr = get_addr(&host, port);
@@ -358,7 +358,7 @@ mod tests {
         let reg = create_registry(LOCAL_PORT);
         reg.bind("verbose", obj_verbose);
         let rmt_reg = get_registry("localhost", LOCAL_PORT);
-        let stb = rmt_reg.lookup_log("verbose").expect("verbose should be in");
+        let stb = rmt_reg.lookup("verbose").expect("verbose should be in");
 
         eprintln!("Stub: {stb:?}");
         //NEED TO KNOW THE RETURN TYPE

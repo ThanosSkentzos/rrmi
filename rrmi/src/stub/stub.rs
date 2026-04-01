@@ -4,9 +4,9 @@ use std::fmt::Debug;
 use serde::{Deserialize, Serialize};
 
 use crate::TcpClient;
-use crate::remote::{RMIResult, RemoteRef};
 use crate::stub::{marshal, unmarshal};
 use crate::transport::{RMIRequest, RMIResponse, Transport};
+use crate::{RMIResult, RemoteRef};
 
 #[allow(dead_code)]
 pub trait RemoteTrait: Send + Sync {

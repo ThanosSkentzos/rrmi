@@ -1,3 +1,4 @@
+use proc_macro2::Span;
 use quote::quote;
 use std::fmt::Debug;
 use syn::{
@@ -6,12 +7,21 @@ use syn::{
     punctuated::Punctuated,
 };
 
-use crate::utils::fix_case;
+use crate::utils::camel_case;
 
 pub struct RemoteObjectInfo {
     pub struct_name: StructNameInfo,
     pub methods: Vec<RemoteMethodInfo>,
     pub original: ItemImpl,
+}
+
+impl RemoteObjectInfo {
+    pub fn get_enum_names(&self) -> (Ident, Ident) {
+        let struct_name = self.struct_name.0.clone();
+        let req_name = Ident::new(&format!("{struct_name}Request"), Span::call_site());
+        let res_name = Ident::new(&format!("{struct_name}Response"), Span::call_site());
+        (req_name, res_name)
+    }
 }
 
 impl Parse for RemoteObjectInfo {
@@ -111,9 +121,9 @@ pub struct RemoteMethodInfo {
 }
 
 impl RemoteMethodInfo {
-    pub fn get_name_fixed(&self) -> Ident {
+    pub fn get_name_camel(&self) -> Ident {
         let name = &self.name;
-        Ident::new(&fix_case(&name.to_string()), name.span().clone())
+        Ident::new(&camel_case(&name.to_string()), name.span().clone())
     }
 
     pub fn get_ret(&self) -> Type {

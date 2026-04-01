@@ -17,11 +17,12 @@ impl Skeleton {
     pub fn listen(self: &Arc<Self>) -> RMIResult<u16> {
         let listener = find_available_port_os()?;
         let self_clone = Arc::clone(&self);
-        let addr = listener.local_addr().expect("should have address");
+        let addr = listener.local_addr().expect("Object should have address");
         std::thread::spawn(move || {
             for stream in listener.incoming() {
                 match stream {
                     Ok(stream) => {
+                        eprintln!("Object received connection from {:?}", stream.peer_addr());
                         if let Err(e) = self_clone.handle_connection(stream) {
                             eprintln!("Error: {e} when handling connection");
                         }

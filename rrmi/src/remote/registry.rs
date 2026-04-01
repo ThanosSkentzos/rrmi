@@ -3,13 +3,12 @@ pub type RMI_ID = usize;
 use super::{RMIResult, RemoteObject, RemoteRef};
 use crate::error::RMIError;
 use crate::stub::{Skeleton, Stub};
+use crate::transport::SocketAddr;
 use crate::transport::utils::{get_addr, get_local_ips};
-use crate::transport::{IpAddr, Ipv4Addr, SocketAddr, TcpListener};
 use crate::transport::{TcpClient, Transport};
 
 use rrmi_macros::remote_object;
 use std::collections::HashMap;
-use std::str::FromStr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 pub struct Registry {
@@ -109,6 +108,8 @@ impl Registry {
 
     pub fn bind(&self, name: &str, object: impl RemoteObject + 'static) -> RMI_ID {
         // bind a skelton to the registry
+        //TODO: object is a skeleton
+        // let skeleton = Arc::new(object);
         let skeleton = Arc::new(Skeleton::new(Arc::new(object)));
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
         self.objects.lock().unwrap().insert(id, skeleton);
@@ -123,6 +124,8 @@ impl Registry {
     }
 }
 
+// AUTO GENERATED CODE
+//TODO handle tthread ids for gracefull shutdown
 // #[derive(Serialize, Deserialize)]
 // pub enum RegistryRequest {
 //     Lookup(String),
@@ -135,58 +138,52 @@ impl Registry {
 //     List(RMIResult<Vec<String>>),
 // }
 
-impl Registry {
-    pub fn listen(self) -> RMIResult<Arc<Registry>> {
-        let socket = SocketAddr::new(
-            IpAddr::V4(Ipv4Addr::from_str("0.0.0.0").expect("0.0.0.0 should pass")),
-            self.port,
-        );
-        let listener =
-            TcpListener::bind(socket).map_err(|e| RMIError::TransportError(e.to_string()))?;
-        eprintln!("RMI Registry listening on {}", socket);
-        let arc_reg = Arc::new(self);
-        let arc_reg_clone = Arc::clone(&arc_reg);
-        std::thread::spawn(move || {
-            // bind separate port for each remote object + client (1 per client)
-            for stream in listener.incoming() {
-                match stream {
-                    Ok(stream) => {
-                        eprintln!("Received connection from {:?}", stream.peer_addr());
-                        if let Err(e) = arc_reg_clone.handle_connection(stream) {
-                            eprintln!("Error: {e} when handling connection");
-                        }
-                    }
-                    Err(e) => eprintln!("Transport error: {e}"),
-                };
-            }
-        });
-        Ok(arc_reg)
+// impl Registry {
+//     pub fn listen(self: &Arc<Self>) -> RMIResult<u16> {
+//         // takes an arc reference to self Arc<Registry>
+//         // clone and move to a listening thread
+//         let listener = TcpListener::bind(("0.0.0.0", self.port))
+//             .map_err(|e| RMIError::TransportError(e.to_string()))?;
+//         let self_clone = Arc::clone(&self);
+//         let addr = listener.local_addr().expect("Registry should have address");
+//         std::thread::spawn(move || {
+//             for stream in listener.incoming() {
+//                 match stream {
+//                     Ok(stream) => {
+//                         eprintln!("Registry received connection from {:?}", stream.peer_addr());
+//                         if let Err(e) = self_clone.handle_connection(stream) {
+//                             eprintln!("Error: {e} when handling connection");
+//                         }
+//                     }
+//                     Err(e) => eprintln!("Transport error: {e}"),
+//                 };
+//             }
+//         });
+//         Ok(addr.port())
+//     }
 
-        // check variable to unbind
-        // gracefull shutdown or kill?
-    }
+// fn handle_connection(&self, mut stream: TcpStream) -> RMIResult<()> {
+//     let request_bytes = receive_data(&mut stream);
+//     let request: RegistryRequest = unmarshal(&request_bytes)?;
 
-    // fn handle_connection(&self, mut stream: TcpStream) -> RMIResult<()> {
-    //     let request_bytes = receive_data(&mut stream);
-    //     let request: RegistryRequest = unmarshal(&request_bytes)?;
+//     let response: RegistryResponse = self.handle_request(request);
 
-    //     let response: RegistryResponse = self.handle_request(request);
+//     let response_bytes = marshal(&response)?;
+//     send_data(response_bytes, &mut stream)
+// }
 
-    //     let response_bytes = marshal(&response)?;
-    //     send_data(response_bytes, &mut stream)
-    // }
-
-    // fn handle_request(&self, req: RegistryRequest) -> RegistryResponse {
-    //     match req {
-    //         RegistryRequest::Lookup { name } => RegistryResponse::Lookup(self.lookup(&name)),
-    //         RegistryRequest::List => RegistryResponse::List(self.list()),
-    //     }
-    // }
-}
+// fn handle_request(&self, req: RegistryRequest) -> RegistryResponse {
+//     match req {
+//         RegistryRequest::Lookup { name } => RegistryResponse::Lookup(self.lookup(&name)),
+//         RegistryRequest::List => RegistryResponse::List(self.list()),
+//     }
+// }
+// }
 
 pub fn create_registry(port: u16) -> Arc<Registry> {
-    let reg = Registry::new(port);
-    let reg = reg.listen().expect("Registry should be able to listen");
+    let reg = Arc::new(Registry::new(port));
+    let port = reg.listen().expect("Registry should be able to listen");
+    eprintln!("RMI Registry listening on {}", port);
     reg
 }
 
@@ -250,7 +247,7 @@ mod tests {
         stub::{RemoteTrait, Stub, marshal, unmarshal},
     };
     use core::{panic, time};
-    use std::net::TcpStream;
+    use rrmi::transport::{TcpListener, TcpStream};
     #[allow(unused_imports)]
     use std::{io::Read, thread, time::Duration};
     use threadpool::ThreadPool;

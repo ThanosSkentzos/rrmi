@@ -76,9 +76,8 @@ pub fn gen_stub(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
         // quote! {fn #method_name()->(){}}
     });
     let impl_from_stub = quote! {
-        use ::rrmi::Stub;
-        impl From<Stub> for #stub_name{
-            fn from(stub: Stub) -> Self{
+        impl From<::rrmi::Stub> for #stub_name{
+            fn from(stub: ::rrmi::Stub) -> Self{
                 #stub_name::new(stub.remote)
             }
         }

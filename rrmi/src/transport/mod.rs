@@ -1,8 +1,8 @@
 mod tcp;
 pub mod utils;
 use crate::RMI_ID;
+use crate::remote::RMIResult;
 use crate::stub::{Deserialize, Serialize};
-use crate::{error::RMIError, remote::RMIResult};
 pub use tcp::{IpAddr, SocketAddr, TcpClient, TcpListener, TcpStream, receive_data, send_data};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -10,15 +10,6 @@ pub struct RMIRequest {
     pub object_id: RMI_ID,
     pub method_name: String, //TODO switch to enum
     pub serialized_args: Vec<u8>,
-}
-impl RMIRequest {
-    pub fn new(object_id: RMI_ID, method_handler: String, serialized_args: Vec<u8>) -> RMIRequest {
-        RMIRequest {
-            object_id,
-            method_name: method_handler,
-            serialized_args,
-        }
-    }
 }
 
 impl Default for RMIRequest {
@@ -31,21 +22,21 @@ impl Default for RMIRequest {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct RMIResponse {
-    pub result: RMIResult<Vec<u8>>,
-}
+// #[derive(Serialize, Deserialize, Debug, Clone)]
+// pub struct RMIResponse {
+//     pub result: RMIResult<Vec<u8>>,
+// }
 
-impl RMIResponse {
-    pub fn success(data: Vec<u8>) -> Self {
-        RMIResponse { result: Ok(data) }
-    }
-    pub fn error(msg: String) -> Self {
-        RMIResponse {
-            result: Err(RMIError::TransportError(msg)),
-        }
-    }
-}
+// impl RMIResponse {
+//     pub fn success(data: Vec<u8>) -> Self {
+//         RMIResponse { result: Ok(data) }
+//     }
+//     pub fn error(msg: String) -> Self {
+//         RMIResponse {
+//             result: Err(RMIError::TransportError(msg)),
+//         }
+//     }
+// }
 
 pub trait Transport: Send + Sync {
     fn send<

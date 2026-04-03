@@ -30,9 +30,13 @@ mod tests {
     #[allow(non_snake_case)]
     fn serde_RMIRequest() {
         let object_id: RMI_ID = 1;
-        let method_handler: String = String::from("this is a test");
+        let method_name: String = String::from("this is a test");
         let serialized_args = vec![0, 1, 2];
-        let data = RMIRequest::new(object_id, method_handler, serialized_args);
+        let data = RMIRequest {
+            object_id,
+            method_name,
+            serialized_args,
+        };
         let data_serial = marshal(&data).expect("data are serializable");
         eprintln!("data : {:?}", data);
         // eprintln!("serialized: {:?}",data_serial);

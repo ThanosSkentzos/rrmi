@@ -1,15 +1,9 @@
 use std::any::type_name_of_val;
 use std::fmt::Debug;
 
-use crate::TcpClient;
-use crate::stub::{Deserialize, Serialize, marshal, unmarshal};
-use crate::transport::{RMIRequest, RMIResponse, Transport};
+use crate::stub::{Deserialize, Serialize};
 use crate::{RMIResult, RemoteRef};
 
-#[allow(dead_code)]
-pub trait RemoteTrait: Send + Sync {
-    fn run_stub<T: for<'de> Deserialize<'de>, A: Serialize>(&self, arg: A) -> RMIResult<T>;
-}
 #[allow(dead_code)]
 pub trait RemoteTraitTest: Send + Sync {
     fn run_stub_test<T: for<'de> Deserialize<'de> + Default, A: Serialize + Debug>(
@@ -19,7 +13,7 @@ pub trait RemoteTraitTest: Send + Sync {
 }
 #[derive(Debug, Clone)]
 pub struct Stub {
-    remote: RemoteRef,
+    pub remote: RemoteRef,
 }
 
 impl Stub {
@@ -33,26 +27,6 @@ impl Stub {
 
     pub fn get_ref(self) -> RemoteRef {
         self.remote.clone()
-    }
-}
-
-impl RemoteTrait for Stub {
-    fn run_stub<R: for<'de> Deserialize<'de>, A: Serialize>(&self, arg: A) -> RMIResult<R> {
-        let serialized_args = marshal(&arg)?;
-
-        let req = RMIRequest {
-            object_id: self.remote.id,
-            method_name: "method_name".into(),
-            serialized_args,
-        };
-        eprintln!("req: {req:?}");
-        let server_addr = self.remote.addr;
-        let transport = TcpClient::new(server_addr);
-        let response: RMIResponse = transport.send(req)?;
-
-        let bytes: Vec<u8> = response.result?;
-        let tuple: R = unmarshal(&bytes)?;
-        Ok(tuple)
     }
 }
 
@@ -74,6 +48,8 @@ mod tests {
     use super::*;
     #[allow(unused_imports)]
     use crate::remote::RMI_ID;
+    #[allow(unused_imports)]
+    use crate::transport::RMIRequest;
 
     #[test]
     #[allow(non_snake_case)]

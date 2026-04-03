@@ -64,11 +64,20 @@ pub fn gen_stub(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
         // quote! {fn #method_name()->(){}}
     });
     let import_transport = quote! {use ::rrmi::Transport;};
+    let impl_from_stub = quote! {
+        use ::rrmi::Stub;
+        impl From<Stub> for #stub_name{
+            fn from(stub: Stub) -> Self{
+                #stub_name::new(stub.remote)
+            }
+        }
+    };
 
     quote! {
         pub struct #stub_name{
             remote: ::rrmi::RemoteRef
         }
+        #impl_from_stub
         #import_transport
         impl #stub_name{
             pub fn new(remote: ::rrmi::RemoteRef) -> Self{
@@ -89,9 +98,9 @@ pub fn gen_listen(_remote_obj: &RemoteObjectInfo) -> TokenStream2 {
             std::thread::spawn(move || {
                 for stream in listener.incoming() {
                     match stream {
-                        Ok(stream) => {
+                        Ok(mut stream) => {
                             eprintln!("{{#struct_name}} received connection from {:?}", stream.peer_addr());
-                            if let Err(e) = self_clone.handle_connection(stream) {
+                            if let Err(e) = self_clone.handle_connection_gen(&mut stream) {
                                 eprintln!("Error: {e} when handling connection");
                             }
                         }
@@ -124,14 +133,14 @@ pub fn gen_listen(_remote_obj: &RemoteObjectInfo) -> TokenStream2 {
 pub fn gen_handle_connection(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
     let (req_name, res_name) = remote_obj.get_enum_names();
     quote! {
-        fn handle_connection(&self, mut stream: ::std::net::TcpStream) -> ::rrmi::RMIResult<()> {
-            let request_bytes = ::rrmi::receive_data(&mut stream);
+        fn handle_connection_gen(&self, stream: &mut ::std::net::TcpStream) -> ::rrmi::RMIResult<()> {
+            let request_bytes = ::rrmi::receive_data(stream);
             let request: #req_name = ::rrmi::unmarshal(&request_bytes)?;
 
-            let response: #res_name = self.handle_request(request);
+            let response: #res_name = self.handle_request_gen(request);
 
             let response_bytes = ::rrmi::marshal(&response)?;
-            ::rrmi::send_data(response_bytes, &mut stream)
+            ::rrmi::send_data(response_bytes, stream)
     }
     }
 }
@@ -164,7 +173,7 @@ pub fn gen_handle_request(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
     });
 
     quote! {
-        fn handle_request(&self, req: #req_name) -> #res_name{
+        fn handle_request_gen(&self, req: #req_name) -> #res_name{
             match req{
                 #(#match_arms),*
             }
@@ -217,6 +226,9 @@ pub fn gen_enums(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
         }
     };
 
+    if remote_obj.struct_name.0 == "MockRemoteObject" {
+        return quote! {#enums};
+    }
     quote! {
         #import_rmiresult
         #enums

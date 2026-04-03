@@ -123,62 +123,6 @@ impl Registry {
     }
 }
 
-// AUTO GENERATED CODE
-//TODO handle tthread ids for gracefull shutdown
-// #[derive(Serialize, Deserialize)]
-// pub enum RegistryRequest {
-//     Lookup(String),
-//     List,
-// }
-
-// #[derive(Serialize, Deserialize)]
-// pub enum RegistryResponse {
-//     Lookup(RMIResult<RemoteRef>),
-//     List(RMIResult<Vec<String>>),
-// }
-
-// impl Registry {
-//     pub fn listen(self: &Arc<Self>) -> RMIResult<u16> {
-//         // takes an arc reference to self Arc<Registry>
-//         // clone and move to a listening thread
-//         let listener = TcpListener::bind(("0.0.0.0", self.port))
-//             .map_err(|e| RMIError::TransportError(e.to_string()))?;
-//         let self_clone = Arc::clone(&self);
-//         let addr = listener.local_addr().expect("Registry should have address");
-//         std::thread::spawn(move || {
-//             for stream in listener.incoming() {
-//                 match stream {
-//                     Ok(stream) => {
-//                         eprintln!("Registry received connection from {:?}", stream.peer_addr());
-//                         if let Err(e) = self_clone.handle_connection(stream) {
-//                             eprintln!("Error: {e} when handling connection");
-//                         }
-//                     }
-//                     Err(e) => eprintln!("Transport error: {e}"),
-//                 };
-//             }
-//         });
-//         Ok(addr.port())
-//     }
-
-// fn handle_connection(&self, mut stream: TcpStream) -> RMIResult<()> {
-//     let request_bytes = receive_data(&mut stream);
-//     let request: RegistryRequest = unmarshal(&request_bytes)?;
-
-//     let response: RegistryResponse = self.handle_request(request);
-
-//     let response_bytes = marshal(&response)?;
-//     send_data(response_bytes, &mut stream)
-// }
-
-// fn handle_request(&self, req: RegistryRequest) -> RegistryResponse {
-//     match req {
-//         RegistryRequest::Lookup { name } => RegistryResponse::Lookup(self.lookup(&name)),
-//         RegistryRequest::List => RegistryResponse::List(self.list()),
-//     }
-// }
-// }
-
 pub fn create_registry(port: u16) -> Arc<Registry> {
     let reg = Arc::new(Registry::new(port));
     let port = reg.listen().expect("Registry should be able to listen");
@@ -186,65 +130,126 @@ pub fn create_registry(port: u16) -> Arc<Registry> {
     reg
 }
 
-// pub struct RegistryStub {
-//     remote: RemoteRef,
-// }
-// impl RegistryStub {
-//     pub fn new(remote: RemoteRef) -> Self {
-//         RegistryStub { remote }
-//     }
-
-//     pub fn lookup(&self, name: &str) -> RMIResult<Stub> {
-//         let transport = TcpClient::new(self.remote.addr);
-//         let req = RegistryRequest::Lookup {
-//             name: name.to_string(),
-//         };
-//         let resp: RegistryResponse = transport.send(req)?;
-//         match resp {
-//             RegistryResponse::Lookup(Ok(res)) => Ok(Stub::new(res)),
-//             _ => Err(RMIError::TransportError("Wrong response".to_string())),
-//         }
-//     }
-//     pub fn list(&self) -> RMIResult<Vec<String>> {
-//         let transport = TcpClient::new(self.remote.addr);
-//         let req = RegistryRequest::List {};
-//         let resp: RegistryResponse = transport.send(req)?;
-//         match resp {
-//             RegistryResponse::List(res) => res,
-//             _ => Err(RMIError::TransportError("Wrong response".to_string())),
-//         }
-//     }
-// }
-
-// impl RegistryStub{
-//     #[allow(dead_code)]
-//     fn lookup_log(&self, name: &str) -> RMIResult<Stub> {
-//         let res = self.lookup(name);
-//         match res.clone() {
-//             Ok(stub) => eprintln!(
-//                 "RegistryStub returned stub for skeleton listening at {:?}",
-//                 stub.get_ref()
-//             ),
-//             Err(_) => (),
-//         }
-//         res
-//     }
-// }
-
 pub fn get_registry(host: &str, port: u16) -> RegistryStub {
     let addr = get_addr(&host, port);
     let remote_ref_ref = RemoteRef::new(addr, 0);
     RegistryStub::new(remote_ref_ref)
     // todo!("to do this I need to ask the registry for its reference and treat it like a skeleton")
 }
+
+// Following code will be generated from the proc-macro
+use ::rrmi::RMIResult;
+use ::rrmi::stub::{Deserialize, Serialize, Stub};
+use ::rrmi::transport::{TcpClient, TcpListener, TcpStream, Transport};
+use rrmi::{marshal, receive_data, send_data, unmarshal};
+
+#[derive(Serialize, Deserialize)]
+pub enum RegistryRequest {
+    Lookup { name: String },
+    List,
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum RegistryResponse {
+    Lookup(RMIResult<RemoteRef>),
+    List(RMIResult<Vec<String>>),
+}
+
+impl Registry {
+    pub fn listen(self: &Arc<Self>) -> RMIResult<u16> {
+        // takes an arc reference to self Arc<Registry>
+        // clone and move to a listening thread
+        let listener = TcpListener::bind(("0.0.0.0", self.port))
+            .map_err(|e| RMIError::TransportError(e.to_string()))?;
+        let self_clone = Arc::clone(&self);
+        let addr = listener.local_addr().expect("Registry should have address");
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                match stream {
+                    Ok(stream) => {
+                        eprintln!("Registry received connection from {:?}", stream.peer_addr());
+                        if let Err(e) = self_clone.handle_connection(stream) {
+                            eprintln!("Error: {e} when handling connection");
+                        }
+                    }
+                    Err(e) => eprintln!("Transport error: {e}"),
+                };
+            }
+        });
+        Ok(addr.port())
+    }
+
+    fn handle_connection(&self, mut stream: TcpStream) -> RMIResult<()> {
+        let request_bytes = receive_data(&mut stream);
+        let request: RegistryRequest = unmarshal(&request_bytes)?;
+
+        let response: RegistryResponse = self.handle_request(request);
+
+        let response_bytes = marshal(&response)?;
+        send_data(response_bytes, &mut stream)
+    }
+
+    fn handle_request(&self, req: RegistryRequest) -> RegistryResponse {
+        match req {
+            RegistryRequest::Lookup { name } => RegistryResponse::Lookup(self.lookup(&name)),
+            RegistryRequest::List => RegistryResponse::List(self.list()),
+        }
+    }
+}
+
+pub struct RegistryStub {
+    remote: RemoteRef,
+}
+impl RegistryStub {
+    pub fn new(remote: RemoteRef) -> Self {
+        RegistryStub { remote }
+    }
+
+    pub fn lookup(&self, name: &str) -> RMIResult<Stub> {
+        let transport = TcpClient::new(self.remote.addr);
+        let req = RegistryRequest::Lookup {
+            name: name.to_string(),
+        };
+        let resp: RegistryResponse = transport.send(req)?;
+        match resp {
+            RegistryResponse::Lookup(Ok(res)) => Ok(Stub::new(res)),
+            _ => Err(RMIError::TransportError("Wrong response".to_string())),
+        }
+    }
+    pub fn list(&self) -> RMIResult<Vec<String>> {
+        let transport = TcpClient::new(self.remote.addr);
+        let req = RegistryRequest::List {};
+        let resp: RegistryResponse = transport.send(req)?;
+        match resp {
+            RegistryResponse::List(res) => res,
+            _ => Err(RMIError::TransportError("Wrong response".to_string())),
+        }
+    }
+}
+
+impl RegistryStub {
+    #[allow(dead_code)]
+    fn lookup_log(&self, name: &str) -> RMIResult<Stub> {
+        let res = self.lookup(name);
+        match res.clone() {
+            Ok(stub) => eprintln!(
+                "RegistryStub returned stub for skeleton listening at {:?}",
+                stub.get_ref()
+            ),
+            Err(_) => (),
+        }
+        res
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{
         receive_data,
-        remote::MockRemoteObject,
+        remote::{MockRemoteObject, MockRemoteObjectStub},
         send_data,
-        stub::{RemoteTrait, Stub, marshal, unmarshal},
+        stub::{Stub, marshal, unmarshal},
     };
     use core::{panic, time};
     use rrmi::transport::{TcpListener, TcpStream};
@@ -348,7 +353,7 @@ mod tests {
     }
 
     #[test]
-    fn local_listen() {
+    fn local_skel_stub() {
         let obj_verbose = MockRemoteObject::verbose();
         let args = vec![42; 2];
         let res_expected = args.clone();
@@ -359,27 +364,33 @@ mod tests {
         reg.bind("verbose", obj_verbose);
         let rmt_reg = get_registry("localhost", LOCAL_PORT);
         let stb = rmt_reg.lookup("verbose").expect("verbose should be in");
-
-        eprintln!("Stub: {stb:?}");
+        eprintln!("Stub: {stb:?} will turn into MockRemoteObjectStub");
+        let stub = MockRemoteObjectStub::from(stb);
+        let res = stub
+            .run("first test", args)
+            .expect("MockObject returns the args");
         //NEED TO KNOW THE RETURN TYPE
-        let res: RMIResult<Vec<u8>> = stb.run_stub(args.clone());
-        assert_eq!(res_expected, res.clone().unwrap());
+        // let res: RMIResult<Vec<u8>> = stb.run_stub(args.clone());
+        assert_eq!(res_expected, res.clone());
         eprintln!("result: {res:?} matched expected\n\n");
 
         let obj2 = MockRemoteObject::verbose();
         let args2 = "I'm here too!";
         let sargs2 = marshal(&args2).expect("should be able to serialize");
-        let resp2 = obj2
-            .run("locally method_name", sargs2)
-            .expect("Mock object returns the args");
-        let res2_expected: String = unmarshal(&resp2).expect("should be able to deserialize");
+        // let resp2 = obj2
+        //     .run("locally method_name", sargs2)
+        //     .expect("Mock object returns the args");
         reg.bind("second", obj2);
         let rmt2 = reg.lookup_log("second").expect("second should be in");
         let stb2 = Stub::new(rmt2);
+        let stub2: MockRemoteObjectStub = stb2.into();
         #[allow(noop_method_call)]
-        let res2: RMIResult<String> = stb2.run_stub(args2.clone());
+        let res2 = stub2
+            .run("mothod_name", sargs2.clone())
+            .expect("Mock object returns the args");
+        let res2_expected: String = unmarshal(&res2).expect("should be able to deserialize");
         eprintln!("result: {res2:?} matched expected\n\n");
-        assert_eq!(res2.unwrap(), res2_expected);
+        assert_eq!(args2, res2_expected);
     }
 
     #[test]
@@ -389,7 +400,7 @@ mod tests {
         let reg = create_registry(REMOTE_TEST_PORT);
         let obj_verbose = MockRemoteObject::verbose();
         reg.bind("verbose", obj_verbose);
-        assert_eq!(sync_receive(REMOTE_TEST_SYNC_PORT), vec![0])
+        assert_eq!(block_receiver(REMOTE_TEST_SYNC_PORT), vec![0])
     }
 
     #[test]
@@ -397,10 +408,12 @@ mod tests {
     fn remote_stub() {
         // runs after remote_listen on 00650??.student.liacs.nl
         let reg = get_registry(REMOTE_HOST, REMOTE_TEST_PORT);
-        let stub = reg.lookup("verbose").expect("should work");
-        let resp: RMIResult<Vec<u8>> = stub.run_stub(vec![42; 2]);
+        let stub: MockRemoteObjectStub = reg.lookup("verbose").expect("should work").into();
+        let res = stub.run("send the data", vec![42; 2]);
+        println!("{res:?}");
+        let resp = res.expect("MockObject sends the args back over the network");
         println!("{resp:?}");
-        sync_send(REMOTE_HOST, REMOTE_TEST_SYNC_PORT);
+        block_sender(REMOTE_HOST, REMOTE_TEST_SYNC_PORT);
     }
 
     fn ensure_connect(socket: &str) -> TcpStream {
@@ -418,13 +431,13 @@ mod tests {
         stream
     }
 
-    fn sync_receive(port: u16) -> Vec<u8> {
+    fn block_receiver(port: u16) -> Vec<u8> {
         let l = TcpListener::bind(format!("0.0.0.0:{}", port)).expect("should be able to get port");
         let (mut stream, _) = l.accept().expect("send message from skel");
         receive_data(&mut stream)
     }
 
-    fn sync_send(host: &str, port: u16) {
+    fn block_sender(host: &str, port: u16) {
         let socket = format!("{host}:{}", port);
         let mut stream = ensure_connect(&socket);
         let data_serial = vec![0];

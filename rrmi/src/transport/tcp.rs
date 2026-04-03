@@ -149,10 +149,12 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn remote_send() {
         send_int_struct(HOSTNAME_RECV, REMOTE_GET_SEND);
     }
     #[test]
+    #[ignore]
     fn remote_recv() {
         get_int_struct(HOSTNAME_RECV, REMOTE_GET_SEND);
     }

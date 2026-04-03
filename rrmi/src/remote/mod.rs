@@ -1,5 +1,8 @@
 pub mod registry;
+use std::net::TcpStream;
+
 pub use registry::{RMI_ID, Registry, create_registry};
+use rrmi_macros::remote_object;
 
 use crate::error::RMIError;
 use crate::stub::{Deserialize, Serialize};
@@ -22,7 +25,13 @@ impl RemoteRef {
 }
 
 pub trait RemoteObject: Send + Sync {
-    fn run(&self, method_name: &str, args: Vec<u8>) -> RMIResult<Vec<u8>>;
+    // fn listen(self: &Arc<Self>) -> RMIResult<u16>;
+    // CANNOT USE AS DYNAMIC WITH &Arc ref
+
+    fn handle_connection(&self, stream: &mut TcpStream) -> RMIResult<()>;
+
+    // fn handle_request<ObjReq, ObjRes>(&self, req: ObjReq) -> ObjRes;
+    //CANNOT USE AS DYNAMIC WITH generic types
 }
 
 pub type RMIResult<T> = Result<T, RMIError>;
@@ -30,19 +39,22 @@ pub type RMIResult<T> = Result<T, RMIError>;
 pub struct MockRemoteObject {
     verbose: bool,
 }
+
+#[remote_object]
 impl MockRemoteObject {
     pub fn new() -> MockRemoteObject {
         MockRemoteObject { verbose: true }
     }
+
     pub fn verbose() -> MockRemoteObject {
         MockRemoteObject { verbose: true }
     }
     pub fn silent() -> MockRemoteObject {
         MockRemoteObject { verbose: false }
     }
-}
-impl RemoteObject for MockRemoteObject {
-    fn run(&self, method_name: &str, args: Vec<u8>) -> RMIResult<Vec<u8>> {
+
+    #[remote]
+    fn run(&self, method_name: &str, args: Vec<u8>) -> Vec<u8> {
         if self.verbose {
             eprintln!("Remote got {method_name} and vec: {args:?}");
             // let result: Vec<u8> =
@@ -50,6 +62,19 @@ impl RemoteObject for MockRemoteObject {
             // .expect("should be able to deserialize");
             // eprintln!("After deserializing: {result:?}");
         }
-        RMIResult::Ok(args)
+        args
     }
+}
+impl RemoteObject for MockRemoteObject {
+    // fn listen(self: &Arc<Self>) -> RMIResult<u16> {
+    //     todo!()
+    // }
+
+    fn handle_connection(&self, stream: &mut TcpStream) -> RMIResult<()> {
+        self.handle_connection_gen(stream)
+    }
+
+    // fn handle_request<RegReq, RegResp>(&self, req: RegReq) -> RegResp {
+    //     todo!()
+    // }
 }

@@ -24,6 +24,11 @@ pub fn remote_object(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let handle_connection = gen_handle_connection(&remote_obj);
     let listen = gen_listen(&remote_obj);
     let stub = gen_stub(&remote_obj);
+
+    if struct_name == "Registry" {
+        return quote! {#original}.into();
+    }
+
     quote! {
         // #_err
         #original

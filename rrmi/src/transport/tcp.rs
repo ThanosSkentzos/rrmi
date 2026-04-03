@@ -11,7 +11,7 @@ use crate::transport::{RMIRequest, Transport};
 
 pub fn send_data(data_serial: Vec<u8>, stream: &mut TcpStream) -> RMIResult<()> {
     let len = data_serial.len() as u32;
-    eprintln!("tcp sending {len} bytes...");
+    // eprintln!("tcp sending {len} bytes...");
     let _ = stream
         .write_all(&len.to_be_bytes())
         .map_err(|e| RMIError::TransportError(e.to_string()))?;
@@ -29,7 +29,7 @@ pub fn receive_data(stream: &mut TcpStream) -> Vec<u8> {
     let _ = stream.read_exact(&mut len_bytes);
     let response_len = u32::from_be_bytes(len_bytes) as usize;
 
-    eprintln!("tcp reading response {response_len:?} bytes...");
+    // eprintln!("tcp reading response {response_len:?} bytes...");
     let mut bytes = vec![0u8; response_len];
     let _ = stream.read_exact(&mut bytes);
     bytes

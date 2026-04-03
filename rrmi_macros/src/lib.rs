@@ -3,9 +3,7 @@ mod structure;
 mod utils;
 
 use crate::{
-    generators::{
-        gen_enums, gen_handle_connection, gen_handle_request, gen_listen, gen_remote_obj, gen_stub,
-    },
+    generators::{gen_enums, gen_handle_connection, gen_handle_request, gen_remote_obj, gen_stub},
     structure::RemoteObjectInfo,
 };
 use proc_macro::TokenStream;
@@ -24,7 +22,7 @@ pub fn remote_object(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let enums = gen_enums(&remote_obj);
     let handle_request = gen_handle_request(&remote_obj);
     let handle_connection = gen_handle_connection(&remote_obj);
-    let listen = gen_listen(&remote_obj);
+    // let listen = gen_listen(&remote_obj);
     let stub = gen_stub(&remote_obj);
     let impl_remote_obj = gen_remote_obj(&remote_obj);
 
@@ -32,7 +30,7 @@ pub fn remote_object(_attr: TokenStream, item: TokenStream) -> TokenStream {
         return quote! {#original}.into();
     }
 
-    quote! {
+    let q = quote! {
     #original
     #enums
     #stub
@@ -42,9 +40,11 @@ pub fn remote_object(_attr: TokenStream, item: TokenStream) -> TokenStream {
         impl #struct_name{
             #handle_request
             #handle_connection
-            #listen
         }
     };
+    };
+    if struct_name == "PA1" {
+        eprintln!("{q}");
     }
-    .into()
+    q.into()
 }

@@ -33,6 +33,7 @@ impl Parse for RemoteObjectInfo {
                 "remote_object: expected a plain struct name",
             )
         })?;
+        // eprintln!("{struct_name:?}");
         let methods: Vec<RemoteMethodInfo> = impl_block
             .items
             .iter_mut()
@@ -149,6 +150,8 @@ impl TryFrom<&mut ImplItemFn> for RemoteMethodInfo {
             .attrs
             .retain(|a| !matches!(&a.meta, Meta::Path(path) if path.is_ident("remote")));
         let name = method.sig.ident.clone();
+        // let s = &method.sig.ident.to_string();
+        // eprintln!("Found remote method: {s}");
         let params = ParametersInfo::from(&method.sig.inputs);
         let ret = method.sig.output.clone();
         Ok(Self { name, params, ret })
@@ -197,6 +200,8 @@ pub struct ParameterInfo(pub (Ident, Type));
 impl TryFrom<&FnArg> for ParameterInfo {
     type Error = ();
     fn try_from(arg: &FnArg) -> Result<Self, ()> {
+        // let fnarg = quote! {#arg};
+        // eprintln!("{fnarg}");
         match arg {
             FnArg::Receiver(_) => Err(()),
             FnArg::Typed(pt) => match pt.pat.as_ref() {

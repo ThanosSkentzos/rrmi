@@ -1,4 +1,5 @@
 pub mod registry;
+mod tests;
 pub use registry::{RMI_ID, Registry, create_registry};
 use rrmi_macros::remote_object;
 

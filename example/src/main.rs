@@ -1,6 +1,7 @@
+use std::sync::atomic::Ordering::SeqCst;
 use std::{
-    sync::{atomic::AtomicU32, Arc, Barrier},
-    thread::{self},
+    sync::atomic::{AtomicBool, AtomicU32, AtomicU8},
+    thread::{self, sleep},
     time::Duration,
 };
 
@@ -9,7 +10,6 @@ use rrmi::{
     remote::{registry::get_registry, RemoteObject},
 };
 use rrmi_macros::remote_object;
-use serde::{Deserialize, Serialize};
 struct Calculator;
 
 #[remote_object]
@@ -28,26 +28,51 @@ impl Calculator {
 }
 struct NumberServer {
     num: AtomicU32,
-    bar: Barrier,
+    inbar: AtomicU8,
+    total: u8,
+    barrier_on: AtomicBool,
+    // bar: Barrier,
 }
 
 #[remote_object]
 impl NumberServer {
-    fn new(total_nodes: usize) -> Self {
+    fn new(total: u8) -> Self {
         let num = 0.into();
-        let bar = Barrier::new(total_nodes);
-        Self { num, bar }
+        // let bar = Barrier::new(total_nodes);
+        let inbar = 0.into();
+        let barrier_on = AtomicBool::new(false);
+        Self {
+            num,
+            inbar,
+            total,
+            barrier_on,
+        }
     }
     #[remote]
     fn get_num(&self) -> u32 {
-        self.num.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        self.num.load(std::sync::atomic::Ordering::SeqCst)
+        self.num.fetch_add(1, SeqCst);
+        self.num.load(SeqCst)
     }
     #[remote]
     fn barrier(&self) -> () {
         let tid = thread::current().id();
         eprintln!("{tid:?} joins the barrier ");
-        self.bar.wait();
+        self.barrier_on.store(true, SeqCst);
+        self.inbar.fetch_add(1, SeqCst);
+        let mut inside = self.inbar.load(SeqCst);
+        if inside == self.total {
+            self.barrier_on.store(false, SeqCst);
+            self.inbar.store(0, SeqCst);
+        }
+        while inside < self.total {
+            inside = self.inbar.load(SeqCst);
+            let status = self.barrier_on.load(SeqCst);
+            if status == false {
+                break;
+            }
+            sleep(Duration::from_nanos(1));
+        }
+        // self.bar.wait();
         eprintln!("{tid:?} escaped!")
     }
 }

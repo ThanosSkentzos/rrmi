@@ -1,6 +1,6 @@
 use crate::error::RMIError;
 use crate::remote::RMIResult;
-use serde::{Deserialize, Serialize};
+pub use serde::{Deserialize, Serialize};
 
 pub fn marshal<T: Serialize>(data: &T) -> RMIResult<Vec<u8>> {
     serde_cbor::to_vec(&data).map_err(|e| RMIError::SerializationError(e.to_string()))

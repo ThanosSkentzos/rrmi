@@ -2,8 +2,8 @@ pub mod registry;
 pub use registry::{RMI_ID, Registry, create_registry};
 
 use crate::error::RMIError;
+use crate::stub::{Deserialize, Serialize};
 use crate::transport::{IpAddr, SocketAddr};
-use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct RemoteRef {

@@ -2,7 +2,7 @@ use std::io::{Read, Write};
 pub use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 use std::sync::Arc;
 
-use serde::{Deserialize, Serialize};
+use crate::stub::{Deserialize, Serialize};
 
 use crate::error::RMIError;
 use crate::remote::{RMIResult, Registry};

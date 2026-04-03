@@ -1,8 +1,8 @@
 mod tcp;
 pub mod utils;
 use crate::RMI_ID;
+use crate::stub::{Deserialize, Serialize};
 use crate::{error::RMIError, remote::RMIResult};
-use serde::{Deserialize, Serialize};
 pub use tcp::{IpAddr, SocketAddr, TcpClient, TcpListener, TcpStream, receive_data, send_data};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]

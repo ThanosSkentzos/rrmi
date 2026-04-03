@@ -1,5 +1,5 @@
 use crate::remote::RMI_ID;
-use serde::{Deserialize, Serialize};
+use crate::stub::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Error, Debug, Clone, Serialize, Deserialize, PartialEq)]

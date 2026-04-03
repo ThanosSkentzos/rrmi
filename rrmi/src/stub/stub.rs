@@ -1,10 +1,8 @@
 use std::any::type_name_of_val;
 use std::fmt::Debug;
 
-use serde::{Deserialize, Serialize};
-
 use crate::TcpClient;
-use crate::stub::{marshal, unmarshal};
+use crate::stub::{Deserialize, Serialize, marshal, unmarshal};
 use crate::transport::{RMIRequest, RMIResponse, Transport};
 use crate::{RMIResult, RemoteRef};
 

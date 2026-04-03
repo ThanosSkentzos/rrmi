@@ -6,6 +6,17 @@ use crate::{
     utils::{already_rmi_result, fix_ref_to_type, fix_ref_when_called, is_str_ref},
 };
 
+pub fn gen_remote_obj(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
+    let struct_name = &remote_obj.struct_name.0;
+    quote! {
+        impl RemoteObject for #struct_name{
+            fn handle_connection(&self, stream: &mut ::rrmi::TcpStream) -> ::rrmi::RMIResult<()> {
+                self.handle_connection_gen(stream)
+        }
+    }
+    }
+}
+
 pub fn gen_stub(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
     let struct_name = &remote_obj.struct_name.0;
     let (req_name, res_name) = remote_obj.get_enum_names();
@@ -40,6 +51,7 @@ pub fn gen_stub(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
         let param_names = params.iter().map(|p| fix_ref_when_called(&p.0));
 
         let fn_contents = quote! {
+            use ::rrmi::Transport;
             let transport_client= ::rrmi::TcpClient::new(self.remote.addr);
             let req = #req_name::#camel{
                 #(#param_names),*
@@ -63,7 +75,6 @@ pub fn gen_stub(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
         quote! {#fn_call}
         // quote! {fn #method_name()->(){}}
     });
-    let import_transport = quote! {use ::rrmi::Transport;};
     let impl_from_stub = quote! {
         use ::rrmi::Stub;
         impl From<Stub> for #stub_name{
@@ -78,7 +89,6 @@ pub fn gen_stub(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
             remote: ::rrmi::RemoteRef
         }
         #impl_from_stub
-        #import_transport
         impl #stub_name{
             pub fn new(remote: ::rrmi::RemoteRef) -> Self{
                 Self{remote}
@@ -133,7 +143,7 @@ pub fn gen_listen(_remote_obj: &RemoteObjectInfo) -> TokenStream2 {
 pub fn gen_handle_connection(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
     let (req_name, res_name) = remote_obj.get_enum_names();
     quote! {
-        fn handle_connection_gen(&self, stream: &mut ::std::net::TcpStream) -> ::rrmi::RMIResult<()> {
+        fn handle_connection_gen(&self, stream: &mut ::rrmi::TcpStream) -> ::rrmi::RMIResult<()> {
             let request_bytes = ::rrmi::receive_data(stream);
             let request: #req_name = ::rrmi::unmarshal(&request_bytes)?;
 
@@ -213,7 +223,6 @@ pub fn gen_enums(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
         quote! { #enum_variant(#ret)}
     });
 
-    let import_rmiresult = quote! {use ::rrmi::RMIResult;};
     let enums = quote! {
         #[derive(serde::Serialize,serde::Deserialize)]
         pub enum #req_name{
@@ -230,7 +239,6 @@ pub fn gen_enums(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
         return quote! {#enums};
     }
     quote! {
-        #import_rmiresult
         #enums
     }
 }

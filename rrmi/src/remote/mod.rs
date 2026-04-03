@@ -1,9 +1,8 @@
 pub mod registry;
-use std::net::TcpStream;
-
 pub use registry::{RMI_ID, Registry, create_registry};
 use rrmi_macros::remote_object;
 
+use crate::TcpStream;
 use crate::error::RMIError;
 use crate::stub::{Deserialize, Serialize};
 use crate::transport::{IpAddr, SocketAddr};
@@ -64,17 +63,4 @@ impl MockRemoteObject {
         }
         args
     }
-}
-impl RemoteObject for MockRemoteObject {
-    // fn listen(self: &Arc<Self>) -> RMIResult<u16> {
-    //     todo!()
-    // }
-
-    fn handle_connection(&self, stream: &mut TcpStream) -> RMIResult<()> {
-        self.handle_connection_gen(stream)
-    }
-
-    // fn handle_request<RegReq, RegResp>(&self, req: RegReq) -> RegResp {
-    //     todo!()
-    // }
 }

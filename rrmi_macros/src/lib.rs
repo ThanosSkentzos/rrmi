@@ -3,7 +3,9 @@ mod structure;
 mod utils;
 
 use crate::{
-    generators::{gen_enums, gen_handle_connection, gen_handle_request, gen_listen, gen_stub},
+    generators::{
+        gen_enums, gen_handle_connection, gen_handle_request, gen_listen, gen_remote_obj, gen_stub,
+    },
     structure::RemoteObjectInfo,
 };
 use proc_macro::TokenStream;
@@ -24,21 +26,25 @@ pub fn remote_object(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let handle_connection = gen_handle_connection(&remote_obj);
     let listen = gen_listen(&remote_obj);
     let stub = gen_stub(&remote_obj);
+    let impl_remote_obj = gen_remote_obj(&remote_obj);
 
     if struct_name == "Registry" {
         return quote! {#original}.into();
     }
 
     quote! {
+    #original
+    #enums
+    #stub
+    #impl_remote_obj
+    const _: () = {
         // #_err
-        #original
-        #enums
         impl #struct_name{
             #handle_request
             #handle_connection
             #listen
         }
-        #stub
+    };
     }
     .into()
 }

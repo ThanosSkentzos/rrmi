@@ -20,8 +20,8 @@ pub fn remote_object(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let struct_name = &remote_obj.struct_name.0;
     let enums = gen_enums(&remote_obj);
-    let handle_request = gen_handle_request(&remote_obj);
     let handle_connection = gen_handle_connection(&remote_obj);
+    let handle_request = gen_handle_request(&remote_obj);
     // let listen = gen_listen(&remote_obj);
     let stub = gen_stub(&remote_obj);
     let impl_remote_obj = gen_remote_obj(&remote_obj);
@@ -38,8 +38,8 @@ pub fn remote_object(_attr: TokenStream, item: TokenStream) -> TokenStream {
     const _: () = {
         // #_err
         impl #struct_name{
-            #handle_request
             #handle_connection
+            #handle_request
         }
     };
     };

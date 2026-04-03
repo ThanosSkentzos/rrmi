@@ -109,7 +109,7 @@ impl Registry {
         // bind a skelton to the registry
         //TODO: object is a skeleton
         // let skeleton = Arc::new(object);
-        let skeleton = Arc::new(Skeleton::new(Arc::new(Mutex::new(object))));
+        let skeleton = Arc::new(Skeleton::new(Arc::new(object)));
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
         self.objects.lock().unwrap().insert(id, skeleton);
         self.names.lock().unwrap().insert(name.to_string(), id);

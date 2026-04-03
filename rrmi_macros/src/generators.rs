@@ -10,7 +10,7 @@ pub fn gen_remote_obj(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
     let struct_name = &remote_obj.struct_name.0;
     quote! {
         impl RemoteObject for #struct_name{
-            fn handle_connection(&mut self, stream: &mut ::rrmi::TcpStream) -> ::rrmi::RMIResult<()> {
+            fn run(&self, stream: &mut ::rrmi::TcpStream) -> ::rrmi::RMIResult<()> {
                 self.handle_connection_gen(stream)
         }
     }
@@ -137,7 +137,7 @@ pub fn gen_stub(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
 pub fn gen_handle_connection(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
     let (req_name, res_name) = remote_obj.get_enum_names();
     quote! {
-        fn handle_connection_gen(&mut self, stream: &mut ::rrmi::TcpStream) -> ::rrmi::RMIResult<()> {
+        fn handle_connection_gen(&self, stream: &mut ::rrmi::TcpStream) -> ::rrmi::RMIResult<()> {
             let request_bytes = ::rrmi::receive_data(stream);
             let request: #req_name = ::rrmi::unmarshal(&request_bytes)?;
 
@@ -176,7 +176,7 @@ pub fn gen_handle_request(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
         quote! { #pattern => #res_name::#camel(#call)}
     });
     quote! {
-        fn handle_request_gen(&mut self, req: #req_name) -> #res_name{
+        fn handle_request_gen(&self, req: #req_name) -> #res_name{
             match req{
                 #(#match_arms),*
             }

@@ -1,14 +1,14 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use crate::remote::{RMIResult, RemoteObject};
 use crate::transport::utils::find_available_port_os;
 
 pub struct Skeleton {
-    object: Arc<Mutex<dyn RemoteObject>>, // Arc because eventually we to listen from several ports
+    object: Arc<dyn RemoteObject>, // Arc because eventually we to listen from several ports
 }
 
 impl Skeleton {
-    pub fn new(object: Arc<Mutex<dyn RemoteObject>>) -> Self {
+    pub fn new(object: Arc<dyn RemoteObject>) -> Self {
         Skeleton { object }
     }
     pub fn listen(self: &Arc<Self>) -> RMIResult<u16> {
@@ -20,12 +20,7 @@ impl Skeleton {
                 match stream {
                     Ok(mut stream) => {
                         // eprintln!("Object received connection from {:?}", stream.peer_addr());
-                        if let Err(e) = self_clone
-                            .object
-                            .lock()
-                            .expect("should be able to unlock eventually")
-                            .handle_connection(&mut stream)
-                        {
+                        if let Err(e) = self_clone.object.run(&mut stream) {
                             eprintln!("Error: {e} when handling connection");
                         }
                     }

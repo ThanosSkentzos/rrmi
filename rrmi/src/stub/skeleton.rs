@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::remote::{RMIResult, RemoteObject};
-use crate::transport::utils::find_available_port_os;
+use crate::transport::utils::get_tcp_port;
 
 pub struct Skeleton {
     object: Arc<dyn RemoteObject>, // Arc because eventually we to listen from several ports
@@ -12,7 +12,7 @@ impl Skeleton {
         Skeleton { object }
     }
     pub fn listen(self: &Arc<Self>) -> RMIResult<u16> {
-        let listener = find_available_port_os()?;
+        let listener = get_tcp_port()?;
         let self_clone = Arc::clone(&self);
         let addr = listener.local_addr().expect("Object should have address");
         std::thread::spawn(move || {

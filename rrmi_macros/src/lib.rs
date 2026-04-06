@@ -26,9 +26,18 @@ pub fn remote_object(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let stub = gen_stub(&remote_obj);
     let impl_remote_obj = gen_remote_obj(&remote_obj);
 
-    if struct_name == "Registry" {
-        return quote! {#original}.into();
-    }
+    // To test registry separately:
+    // if struct_name == "Registry" {
+    //     return quote! {
+    //         #original
+    //         #impl_remote_obj
+    //         impl #struct_name{
+    //             #handle_connection
+    //             #handle_request
+    //         }
+    //     }
+    //     .into();
+    // }
 
     let q = quote! {
     #original

@@ -94,46 +94,6 @@ pub fn gen_stub(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
     }
 }
 
-// pub fn gen_listen(_remote_obj: &RemoteObjectInfo) -> TokenStream2 {
-//     let struct_name = &_remote_obj.struct_name.0;
-//     let listening_thread = quote! {
-//             let self_clone = std::sync::Arc::clone(&self);
-//             let addr = listener.local_addr().expect("{#struct_name} should have address");
-//             std::thread::spawn(move || {
-//                 for stream in listener.incoming() {
-//                     match stream {
-//                         Ok(mut stream) => {
-//                             eprintln!("{{#struct_name}} received connection from {:?}", stream.peer_addr());
-//                             if let Err(e) = self_clone.handle_connection_gen(&mut stream) {
-//                                 eprintln!("Error: {e} when handling connection");
-//                             }
-//                         }
-//                         Err(e) => eprintln!("Transport error: {e}"),
-//                     };
-//                 }
-//             });
-//             Ok(addr.port())
-//     };
-//     if struct_name == "Registry" {
-//         quote! {
-//             pub fn listen(self: &Arc<Self>) -> ::rrmi::RMIResult<u16> {
-//                 // takes an arc reference to self Arc<Registry>
-//                 // clone and move to a listening thread
-//                 let listener = ::rrmi::transport::TcpListener::bind(("0.0.0.0", self.port))
-//                     .map_err(|e| ::rrmi::RMIError::TransportError(e.to_string()))?;
-//                 #listening_thread
-//             }
-//         }
-//     } else {
-//         quote! {
-//             pub fn listen(self: &std::sync::Arc<Self>) -> rrmi::RMIResult<u16> {
-//                 let listener = ::rrmi::utils::find_available_port_os()?;
-//                 #listening_thread
-//             }
-//         }
-//     }
-// }
-
 pub fn gen_handle_connection(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
     let (req_name, res_name) = remote_obj.get_enum_names();
     quote! {

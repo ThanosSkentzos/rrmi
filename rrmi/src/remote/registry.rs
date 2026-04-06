@@ -35,10 +35,11 @@ impl Registry {
 
     pub fn get_addr(&self, port: u16) -> SocketAddr {
         // this will be slower than just saving it
-        let ips = get_local_ips().expect("Should be able to get local ip");
-        let ip = ips[0]; //use 1st for now TODO handle eth or ib
+        let ips = get_local_ips().expect("Should have at least 1 IP. Todo: handle eth/ib");
+        let ip = ips[0];
         SocketAddr::new(ip, port)
     }
+
     pub fn remove(&self, name: &str) -> RMIResult<()> {
         let mut names = self.names.lock().unwrap();
         let id = names
@@ -46,7 +47,6 @@ impl Registry {
             .cloned()
             .ok_or(RMIError::NameNotFound(name.to_string()))?;
         names.remove(name);
-
         let mut objects = self.objects.lock().unwrap();
         let _sk = objects.remove(&id).ok_or(RMIError::ObjectNotFound(id))?;
         // todo!("make sure the object is also droped");
@@ -55,11 +55,6 @@ impl Registry {
         // let weak = Arc::strong_count(&sk);
         // eprintln!("removed: now strong, weak = {strong},{weak} remaining: {left}");
         Ok(())
-    }
-    #[allow(dead_code)]
-    pub fn remove_log(&self, name: &str) -> RMIResult<()> {
-        eprintln!("removing {name}");
-        self.remove(name)
     }
 
     pub fn get(&self, id: &RMI_ID) -> RMIResult<Arc<Skeleton>> {
@@ -70,8 +65,9 @@ impl Registry {
             .cloned()
             .ok_or(RMIError::ObjectNotFound(*id))
     }
+
     #[remote]
-    fn lookup(&self, name: &str) -> RMIResult<RemoteRef> {
+    pub fn lookup(&self, name: &str) -> RMIResult<RemoteRef> {
         //! name -> remote ref | for client
         let names = self.names.lock().unwrap();
         let id = names
@@ -81,19 +77,6 @@ impl Registry {
         let port = skeleton.listen()?;
         let addr = self.get_addr(port);
         Ok(RemoteRef { addr, id: *id })
-    }
-
-    #[allow(dead_code)]
-    pub fn lookup_log(&self, name: &str) -> RMIResult<RemoteRef> {
-        let res = self.lookup(name);
-        match res.clone() {
-            Ok(rref) => eprintln!(
-                "Registry gives ref to skeleton listening at {:?}",
-                rref.addr
-            ),
-            Err(_) => (),
-        }
-        res
     }
 
     #[remote]
@@ -132,28 +115,13 @@ pub fn create_registry(port: u16) -> Arc<Registry> {
 
 pub fn get_registry(host: &str, port: u16) -> RegistryStub {
     let addr = get_addr(&host, port);
-    let remote_ref_ref = RemoteRef::new(addr, 0);
-    RegistryStub::new(remote_ref_ref)
+    let remote = RemoteRef::new(addr, 0);
+    RegistryStub { remote }
     // todo!("to do this I need to ask the registry for its reference and treat it like a skeleton")
 }
 
-// Following code will be generated from the proc-macro
 use ::rrmi::RMIResult;
-use ::rrmi::stub::{Deserialize, Serialize, Stub};
-use ::rrmi::transport::{TcpClient, TcpListener, TcpStream, Transport};
-use rrmi::{marshal, receive_data, send_data, unmarshal};
-
-#[derive(Serialize, Deserialize)]
-pub enum RegistryRequest {
-    Lookup { name: String },
-    List,
-}
-
-#[derive(Serialize, Deserialize)]
-pub enum RegistryResponse {
-    Lookup(RMIResult<RemoteRef>),
-    List(RMIResult<Vec<String>>),
-}
+use ::rrmi::transport::TcpListener;
 
 impl Registry {
     pub fn listen(self: &Arc<Self>) -> RMIResult<u16> {
@@ -166,9 +134,9 @@ impl Registry {
         std::thread::spawn(move || {
             for stream in listener.incoming() {
                 match stream {
-                    Ok(stream) => {
+                    Ok(mut stream) => {
                         eprintln!("Registry received connection from {:?}", stream.peer_addr());
-                        if let Err(e) = self_clone.handle_connection(stream) {
+                        if let Err(e) = self_clone.run(&mut stream) {
                             eprintln!("Error: {e} when handling connection");
                         }
                     }
@@ -178,66 +146,68 @@ impl Registry {
         });
         Ok(addr.port())
     }
-
-    fn handle_connection(&self, mut stream: TcpStream) -> RMIResult<()> {
-        let request_bytes = receive_data(&mut stream);
-        let request: RegistryRequest = unmarshal(&request_bytes)?;
-
-        let response: RegistryResponse = self.handle_request(request);
-
-        let response_bytes = marshal(&response)?;
-        send_data(response_bytes, &mut stream)
-    }
-
-    fn handle_request(&self, req: RegistryRequest) -> RegistryResponse {
-        match req {
-            RegistryRequest::Lookup { name } => RegistryResponse::Lookup(self.lookup(&name)),
-            RegistryRequest::List => RegistryResponse::List(self.list()),
-        }
-    }
 }
 
-pub struct RegistryStub {
-    remote: RemoteRef,
-}
-impl RegistryStub {
-    pub fn new(remote: RemoteRef) -> Self {
-        RegistryStub { remote }
-    }
+// // Following code will be generated from the proc-macro
+// use ::rrmi::stub::{Deserialize, Serialize, Stub};
+// use ::rrmi::transport::{TcpClient, TcpStream, Transport};
+// use rrmi::{marshal, receive_data, send_data, unmarshal};
 
-    pub fn lookup(&self, name: &str) -> RMIResult<Stub> {
-        let transport = TcpClient::new(self.remote.addr);
-        let req = RegistryRequest::Lookup {
-            name: name.to_string(),
-        };
-        let resp: RegistryResponse = transport.send(req)?;
-        match resp {
-            RegistryResponse::Lookup(Ok(res)) => Ok(Stub::new(res)),
-            _ => Err(RMIError::TransportError("Wrong response".to_string())),
-        }
-    }
-    pub fn list(&self) -> RMIResult<Vec<String>> {
-        let transport = TcpClient::new(self.remote.addr);
-        let req = RegistryRequest::List {};
-        let resp: RegistryResponse = transport.send(req)?;
-        match resp {
-            RegistryResponse::List(res) => res,
-            _ => Err(RMIError::TransportError("Wrong response".to_string())),
-        }
-    }
-}
+// #[derive(Serialize, Deserialize)]
+// pub enum RegistryRequest {
+//     Lookup { name: String },
+//     List,
+// }
 
-impl RegistryStub {
-    #[allow(dead_code)]
-    fn lookup_log(&self, name: &str) -> RMIResult<Stub> {
-        let res = self.lookup(name);
-        match res.clone() {
-            Ok(stub) => eprintln!(
-                "RegistryStub returned stub for skeleton listening at {:?}",
-                stub.get_ref()
-            ),
-            Err(_) => (),
-        }
-        res
-    }
-}
+// #[derive(Serialize, Deserialize)]
+// pub enum RegistryResponse {
+//     Lookup(RMIResult<RemoteRef>),
+//     List(RMIResult<Vec<String>>),
+// }
+
+// #[allow(dead_code)]
+// impl Registry {
+//     fn handle_connection(&self, mut stream: TcpStream) -> RMIResult<()> {
+//         let request_bytes = receive_data(&mut stream);
+//         let request: RegistryRequest = unmarshal(&request_bytes)?;
+//         let response: RegistryResponse = self.handle_request(request);
+//         let response_bytes = marshal(&response)?;
+//         send_data(response_bytes, &mut stream)
+//     }
+//     fn handle_request(&self, req: RegistryRequest) -> RegistryResponse {
+//         match req {
+//             RegistryRequest::Lookup { name } => RegistryResponse::Lookup(self.lookup(&name)),
+//             RegistryRequest::List => RegistryResponse::List(self.list()),
+//         }
+//     }
+// }
+
+// pub struct RegistryStub {
+//     remote: RemoteRef,
+// }
+// impl RegistryStub {
+//     pub fn new(remote: RemoteRef) -> Self {
+//         RegistryStub { remote }
+//     }
+
+//     pub fn lookup(&self, name: &str) -> RMIResult<Stub> {
+//         let transport = TcpClient::new(self.remote.addr);
+//         let req = RegistryRequest::Lookup {
+//             name: name.to_string(),
+//         };
+//         let resp: RegistryResponse = transport.send(req)?;
+//         match resp {
+//             RegistryResponse::Lookup(Ok(res)) => Ok(Stub::new(res)),
+//             _ => Err(RMIError::TransportError("Wrong response".to_string())),
+//         }
+//     }
+//     pub fn list(&self) -> RMIResult<Vec<String>> {
+//         let transport = TcpClient::new(self.remote.addr);
+//         let req = RegistryRequest::List {};
+//         let resp: RegistryResponse = transport.send(req)?;
+//         match resp {
+//             RegistryResponse::List(res) => res,
+//             _ => Err(RMIError::TransportError("Wrong response".to_string())),
+//         }
+//     }
+// }

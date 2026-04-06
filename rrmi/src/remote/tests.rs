@@ -92,18 +92,18 @@ mod tests {
         reg.bind("verbose", verbose);
         reg.bind("silent", silent);
 
-        let _remote = reg.lookup_log("silent").expect("silent should be in");
-        let _remote = reg.lookup_log("verbose").expect("verbose should be in");
+        let _remote = reg.lookup("silent").expect("silent should be in");
+        let _remote = reg.lookup("verbose").expect("verbose should be in");
 
         let l = reg.list().expect("two already in");
         let l_rmt = rmt_reg.list().expect("same");
         eprintln!("local: {:?} vs remote: {:?}", l, l_rmt);
-        reg.remove_log("verbose").expect("still in");
+        reg.remove("verbose").expect("still in");
 
         let l = reg.list().expect("one still in");
         let l_rmt = rmt_reg.list().expect("same");
         eprintln!("local: {:?} vs remote: {:?}", l, l_rmt);
-        reg.remove_log("silent").expect("still in");
+        reg.remove("silent").expect("still in");
 
         match reg.list() {
             Ok(_) => panic!("should not have any other objects"),
@@ -141,7 +141,7 @@ mod tests {
         //     .run("locally method_name", sargs2)
         //     .expect("Mock object returns the args");
         reg.bind("second", obj2);
-        let rmt2 = reg.lookup_log("second").expect("second should be in");
+        let rmt2 = reg.lookup("second").expect("second should be in");
         let stb2 = Stub::new(rmt2);
         let stub2: MockRemoteObjectStub = stb2.into();
         #[allow(noop_method_call)]

@@ -22,22 +22,6 @@ impl Default for RMIRequest {
     }
 }
 
-// #[derive(Serialize, Deserialize, Debug, Clone)]
-// pub struct RMIResponse {
-//     pub result: RMIResult<Vec<u8>>,
-// }
-
-// impl RMIResponse {
-//     pub fn success(data: Vec<u8>) -> Self {
-//         RMIResponse { result: Ok(data) }
-//     }
-//     pub fn error(msg: String) -> Self {
-//         RMIResponse {
-//             result: Err(RMIError::TransportError(msg)),
-//         }
-//     }
-// }
-
 pub trait Transport: Send + Sync {
     fn send<
         REQ: Serialize + for<'de> Deserialize<'de>,

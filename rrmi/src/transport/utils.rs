@@ -9,7 +9,7 @@ static START: u16 = 31768;
 #[allow(dead_code)]
 static END: u16 = 60999;
 #[allow(dead_code)]
-pub fn find_available_port_mine() -> RMIResult<(TcpListener, u16)> {
+pub fn get_tcp_port_keep_list() -> RMIResult<(TcpListener, u16)> {
     for port in START..END {
         match TcpListener::bind(("0.0.0.0", port)) {
             Ok(l) => return Ok((l, port)),
@@ -18,7 +18,7 @@ pub fn find_available_port_mine() -> RMIResult<(TcpListener, u16)> {
     }
     Err(RMIError::TransportError("No available ports".to_string()))
 }
-pub fn find_available_port_os() -> RMIResult<TcpListener> {
+pub fn get_tcp_port() -> RMIResult<TcpListener> {
     TcpListener::bind(("0.0.0.0", 0)).map_err(|e| RMIError::TransportError(e.to_string()))
 }
 
@@ -84,10 +84,10 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .expect("should be able to get time");
         let s = Instant::now();
-        let (t, _p) = find_available_port_mine().expect("should have available ports");
+        let (t, _p) = get_tcp_port_keep_list().expect("should have available ports");
         let mut a = vec![t];
         for _ in 1..TOTAL {
-            let (t, _p) = find_available_port_mine().expect("should have available ports");
+            let (t, _p) = get_tcp_port_keep_list().expect("should have available ports");
             // eprintln!("{p:?}");
             a.push(t);
         }
@@ -104,10 +104,10 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .expect("should be able to get time");
         let s = Instant::now();
-        let t = find_available_port_os().expect("should have available ports");
+        let t = get_tcp_port().expect("should have available ports");
         let mut a = vec![t];
         for _ in 1..TOTAL {
-            let t = find_available_port_os().expect("should have available ports");
+            let t = get_tcp_port().expect("should have available ports");
             // eprintln!("{t:?}");
             a.push(t);
         }

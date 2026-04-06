@@ -1,13 +1,12 @@
 use std::io::{Read, Write};
 pub use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
-use std::sync::Arc;
 
 use crate::stub::{Deserialize, Serialize};
 
 use crate::error::RMIError;
-use crate::remote::{RMIResult, Registry};
+use crate::remote::RMIResult;
 use crate::stub::{marshal, unmarshal};
-use crate::transport::{RMIRequest, Transport};
+use crate::transport::Transport;
 
 pub fn send_data(data_serial: Vec<u8>, stream: &mut TcpStream) -> RMIResult<()> {
     let len = data_serial.len() as u32;
@@ -64,63 +63,12 @@ impl Transport for TcpClient {
         Ok(response)
     }
 }
-#[allow(dead_code)]
-pub struct TcpServer {
-    registry: Arc<Registry>, // resource count cause might be used by multiple
-}
-#[allow(dead_code)]
-impl TcpServer {
-    pub fn new(registry: Arc<Registry>) -> Self {
-        TcpServer { registry }
-    }
-
-    pub fn bind(&self, addr: SocketAddr) -> RMIResult<()> {
-        let listener =
-            TcpListener::bind(addr).map_err(|e| RMIError::TransportError(e.to_string()))?;
-        eprintln!("RMI Server listening on {}", addr);
-        for stream in listener.incoming() {
-            match stream {
-                Ok(stream) => {
-                    let client_addr = stream
-                        .peer_addr()
-                        .unwrap_or_else(|_| "unknown".parse().unwrap());
-                    eprintln!("New connection from {}", client_addr);
-
-                    if let Err(e) = &self.handle_connection(stream) {
-                        eprintln!("Error handling connection from {}: {}", client_addr, e);
-                    }
-                }
-                Err(e) => {
-                    eprintln!("Error accepting connection: {}", e)
-                }
-            }
-        }
-        Ok(())
-    }
-
-    fn handle_connection(&self, mut stream: TcpStream) -> RMIResult<()> {
-        let request_bytes = receive_data(&mut stream);
-        let request: RMIRequest = unmarshal(&request_bytes)?;
-        eprintln!(
-            "Received request for object_id= {}, method= {}",
-            request.object_id, request.method_name
-        );
-
-        let _object = self.registry.get(&request.object_id)?;
-        let _response: RMIResult<()> = todo!("work with");
-        // let response = self.skeleton.handle_request(request, object.as_ref());
-        #[allow(unreachable_code)]
-        let response_bytes = marshal(&_response)?;
-        send_data(response_bytes, &mut stream)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::thread;
 
     use super::*;
-    use crate::utils::get_addr;
+    use crate::{transport::RMIRequest, utils::get_addr};
     static HOSTNAME_RECV: &str = "0065074.student.liacs.nl";
     static LOCAL_GET_SEND: u16 = 10999;
     static REMOTE_GET_SEND: u16 = 11000;

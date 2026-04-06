@@ -6,6 +6,7 @@ use crate::stub::{Deserialize, Serialize};
 pub use tcp::{IpAddr, SocketAddr, TcpClient, TcpListener, TcpStream, receive_data, send_data};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[allow(dead_code)]
 pub struct RMIRequest {
     pub object_id: RMI_ID,
     pub method_name: String, //TODO switch to enum

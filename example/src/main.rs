@@ -55,8 +55,8 @@ impl NumberServer {
     }
     #[remote]
     fn barrier(&self) -> () {
-        let tid = thread::current().id();
-        eprintln!("{tid:?} joins the barrier ");
+        // let tid = thread::current().id();
+        // eprintln!("{tid:?} joins the barrier ");
         self.barrier_on.store(true, SeqCst);
         self.inbar.fetch_add(1, SeqCst);
         let mut inside = self.inbar.load(SeqCst);
@@ -73,16 +73,21 @@ impl NumberServer {
             sleep(Duration::from_nanos(1));
         }
         // self.bar.wait();
-        eprintln!("{tid:?} escaped!")
+        // eprintln!("{tid:?} escaped!")
     }
 }
 
-fn run_thread(stub: &NumberServerStub) {
+fn run_thread(stub: &NumberServerStub, char: &str) {
     let times = 10000;
+    let _ = stub.barrier();
     for i in 0..times {
         _ = stub.get_num().expect("should be able to get number");
         if i % 1000 == 0 {
+            eprint!("{char}");
             _ = stub.barrier();
+            if char == "A" {
+                eprintln!("|");
+            }
         }
     }
 }
@@ -117,7 +122,7 @@ fn main() {
             .lookup("NumberServer")
             .expect("should be able to get object")
             .into();
-        run_thread(&stub);
+        run_thread(&stub, "A");
     });
     let reg = get_registry("localhost", port);
     thread::spawn(move || {
@@ -125,9 +130,9 @@ fn main() {
             .lookup("NumberServer")
             .expect("should be able to get object")
             .into();
-        run_thread(&stub);
+        run_thread(&stub, "B");
     });
-    run_thread(&stub);
+    run_thread(&stub, "C");
     thread::sleep(Duration::from_millis(100));
     let from_stub = stub.get_num().expect("should be able to get number");
     eprintln!("Number from object: {from_obj} - from stub: {from_stub}");

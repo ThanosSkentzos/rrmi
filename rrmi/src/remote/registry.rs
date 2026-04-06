@@ -148,66 +148,66 @@ impl Registry {
     }
 }
 
-// // Following code will be generated from the proc-macro
-// use ::rrmi::stub::{Deserialize, Serialize, Stub};
-// use ::rrmi::transport::{TcpClient, TcpStream, Transport};
-// use rrmi::{marshal, receive_data, send_data, unmarshal};
+// Following code will be generated from the proc-macro
+use ::rrmi::stub::{Deserialize, Serialize, Stub};
+use ::rrmi::transport::{TcpClient, TcpStream, Transport};
+use rrmi::{marshal, receive_data, send_data, unmarshal};
 
-// #[derive(Serialize, Deserialize)]
-// pub enum RegistryRequest {
-//     Lookup { name: String },
-//     List,
-// }
+#[derive(Serialize, Deserialize)]
+pub enum RegistryRequest {
+    Lookup { name: String },
+    List,
+}
 
-// #[derive(Serialize, Deserialize)]
-// pub enum RegistryResponse {
-//     Lookup(RMIResult<RemoteRef>),
-//     List(RMIResult<Vec<String>>),
-// }
+#[derive(Serialize, Deserialize)]
+pub enum RegistryResponse {
+    Lookup(RMIResult<RemoteRef>),
+    List(RMIResult<Vec<String>>),
+}
 
-// #[allow(dead_code)]
-// impl Registry {
-//     fn handle_connection(&self, mut stream: TcpStream) -> RMIResult<()> {
-//         let request_bytes = receive_data(&mut stream);
-//         let request: RegistryRequest = unmarshal(&request_bytes)?;
-//         let response: RegistryResponse = self.handle_request(request);
-//         let response_bytes = marshal(&response)?;
-//         send_data(response_bytes, &mut stream)
-//     }
-//     fn handle_request(&self, req: RegistryRequest) -> RegistryResponse {
-//         match req {
-//             RegistryRequest::Lookup { name } => RegistryResponse::Lookup(self.lookup(&name)),
-//             RegistryRequest::List => RegistryResponse::List(self.list()),
-//         }
-//     }
-// }
+#[allow(dead_code)]
+impl Registry {
+    fn handle_connection(&self, mut stream: TcpStream) -> RMIResult<()> {
+        let request_bytes = receive_data(&mut stream);
+        let request: RegistryRequest = unmarshal(&request_bytes)?;
+        let response: RegistryResponse = self.handle_request(request);
+        let response_bytes = marshal(&response)?;
+        send_data(response_bytes, &mut stream)
+    }
+    fn handle_request(&self, req: RegistryRequest) -> RegistryResponse {
+        match req {
+            RegistryRequest::Lookup { name } => RegistryResponse::Lookup(self.lookup(&name)),
+            RegistryRequest::List => RegistryResponse::List(self.list()),
+        }
+    }
+}
 
-// pub struct RegistryStub {
-//     remote: RemoteRef,
-// }
-// impl RegistryStub {
-//     pub fn new(remote: RemoteRef) -> Self {
-//         RegistryStub { remote }
-//     }
+pub struct RegistryStub {
+    remote: RemoteRef,
+}
+impl RegistryStub {
+    pub fn new(remote: RemoteRef) -> Self {
+        RegistryStub { remote }
+    }
 
-//     pub fn lookup(&self, name: &str) -> RMIResult<Stub> {
-//         let transport = TcpClient::new(self.remote.addr);
-//         let req = RegistryRequest::Lookup {
-//             name: name.to_string(),
-//         };
-//         let resp: RegistryResponse = transport.send(req)?;
-//         match resp {
-//             RegistryResponse::Lookup(Ok(res)) => Ok(Stub::new(res)),
-//             _ => Err(RMIError::TransportError("Wrong response".to_string())),
-//         }
-//     }
-//     pub fn list(&self) -> RMIResult<Vec<String>> {
-//         let transport = TcpClient::new(self.remote.addr);
-//         let req = RegistryRequest::List {};
-//         let resp: RegistryResponse = transport.send(req)?;
-//         match resp {
-//             RegistryResponse::List(res) => res,
-//             _ => Err(RMIError::TransportError("Wrong response".to_string())),
-//         }
-//     }
-// }
+    pub fn lookup(&self, name: &str) -> RMIResult<Stub> {
+        let transport = TcpClient::new(self.remote.addr);
+        let req = RegistryRequest::Lookup {
+            name: name.to_string(),
+        };
+        let resp: RegistryResponse = transport.send(req)?;
+        match resp {
+            RegistryResponse::Lookup(Ok(res)) => Ok(Stub::new(res)),
+            _ => Err(RMIError::TransportError("Wrong response".to_string())),
+        }
+    }
+    pub fn list(&self) -> RMIResult<Vec<String>> {
+        let transport = TcpClient::new(self.remote.addr);
+        let req = RegistryRequest::List {};
+        let resp: RegistryResponse = transport.send(req)?;
+        match resp {
+            RegistryResponse::List(res) => res,
+            _ => Err(RMIError::TransportError("Wrong response".to_string())),
+        }
+    }
+}

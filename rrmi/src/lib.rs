@@ -7,6 +7,7 @@ mod error;
 mod transport;
 pub use error::RMIError;
 
+// need for rrmi_macros
 extern crate self as rrmi;
 pub use remote::{RMIResult, RemoteRef};
 pub use stub::{Stub, marshal, unmarshal};

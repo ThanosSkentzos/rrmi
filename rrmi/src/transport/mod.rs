@@ -1,4 +1,5 @@
 mod tcp;
+mod tests;
 pub mod utils;
 use crate::RMI_ID;
 use crate::remote::RMIResult;

@@ -93,7 +93,7 @@ mod tests {
         });
         thread::sleep(std::time::Duration::from_millis(100));
         send_int_struct("localhost", LOCAL_GET_SEND);
-        recv_handle.join().unwrap();
+        recv_handle.join().expect("should be able to join");
     }
 
     #[test]

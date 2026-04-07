@@ -13,6 +13,9 @@ pub fn gen_remote_obj(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
             fn run(&self, stream: &mut ::rrmi::TcpStream) -> ::rrmi::RMIResult<()> {
                 self.handle_connection_gen(stream)
         }
+            fn name(&self) -> &'static str{
+                stringify!(#struct_name)
+            }
     }
     }
 }
@@ -75,19 +78,20 @@ pub fn gen_stub(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
         quote! {#fn_call}
         // quote! {fn #method_name()->(){}}
     });
-    let impl_from_stub = quote! {
+    let stub_struct = quote! {
+        pub struct #stub_name{
+            remote: ::rrmi::RemoteRef,
+            stub_name: String,
+        }
         impl From<::rrmi::Stub> for #stub_name{
             fn from(stub: ::rrmi::Stub) -> Self{
-                #stub_name{remote: stub.remote}
+                #stub_name{remote: stub.remote, stub_name: "#stub_name".into()}
             }
         }
     };
 
     quote! {
-        pub struct #stub_name{
-            remote: ::rrmi::RemoteRef
-        }
-        #impl_from_stub
+        #stub_struct
         impl #stub_name{
         #(#functions)*
         }

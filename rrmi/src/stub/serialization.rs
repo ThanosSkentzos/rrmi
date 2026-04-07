@@ -3,10 +3,16 @@ use crate::remote::RMIResult;
 pub use serde::{Deserialize, Serialize};
 
 pub fn marshal<T: Serialize>(data: &T) -> RMIResult<Vec<u8>> {
-    serde_cbor::to_vec(&data).map_err(|e| RMIError::SerializationError(e.to_string()))
+    serde_cbor::to_vec(&data).map_err(|e| {
+        eprintln!("Marshaling error: {e}");
+        RMIError::SerializationError(e.to_string())
+    })
 }
 pub fn unmarshal<T: for<'de> Deserialize<'de>>(bytes: &Vec<u8>) -> RMIResult<T> {
-    serde_cbor::from_slice(&bytes).map_err(|e| RMIError::DeserializationError(e.to_string()))
+    serde_cbor::from_slice(&bytes).map_err(|e| {
+        eprintln!("Unmarshaling error: {e}");
+        RMIError::DeserializationError(e.to_string())
+    })
 }
 
 #[cfg(test)]

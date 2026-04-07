@@ -40,7 +40,7 @@ impl Parse for RemoteObjectInfo {
             .filter_map(|x| {
                 match x {
                     ImplItem::Fn(method) => RemoteMethodInfo::try_from(&mut *method)
-                        .map_err(|_| syn::Error::new_spanned(method, "Problem parsing function")),
+                        .map_err(|e| syn::Error::new_spanned(method, format!("Problem parsing function: {e:?}"))),
                     _ => Err(syn::Error::new_spanned(x, "Could not parse as a function")),
                 }
                 .ok()

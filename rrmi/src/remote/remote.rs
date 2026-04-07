@@ -29,7 +29,7 @@ pub trait RemoteObject: Send + Sync {
     // CANNOT USE AS DYNAMIC WITH &Arc ref
 
     fn run(&self, stream: &mut TcpStream) -> RMIResult<()>;
-
+    fn name(&self) -> &'static str;
     // fn handle_request<ObjReq, ObjRes>(&self, req: ObjReq) -> ObjRes;
     //CANNOT USE AS DYNAMIC WITH generic types
 }

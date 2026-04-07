@@ -9,7 +9,7 @@ static START: u16 = 31768;
 #[allow(dead_code)]
 static END: u16 = 60999;
 #[allow(dead_code)]
-pub fn get_tcp_port_keep_list() -> RMIResult<(TcpListener, u16)> {
+pub fn get_tcp_socket_manual() -> RMIResult<(TcpListener, u16)> {
     for port in START..END {
         match TcpListener::bind(("0.0.0.0", port)) {
             Ok(l) => return Ok((l, port)),
@@ -18,12 +18,14 @@ pub fn get_tcp_port_keep_list() -> RMIResult<(TcpListener, u16)> {
     }
     Err(RMIError::TransportError("No available ports".to_string()))
 }
-pub fn get_tcp_port() -> RMIResult<TcpListener> {
+pub fn get_tcp_socket() -> RMIResult<TcpListener> {
     TcpListener::bind(("0.0.0.0", 0)).map_err(|e| RMIError::TransportError(e.to_string()))
 }
 
 pub fn get_addr(hostname: &str, port: u16) -> SocketAddr {
-    let ips: Vec<IpAddr> = dns_lookup::lookup_host(hostname).unwrap().collect();
+    let ips: Vec<IpAddr> = dns_lookup::lookup_host(hostname)
+        .expect("should be able to get own address")
+        .collect();
     eprintln!("IPs for {hostname}: {ips:?}");
     if ips.len() == 0 {
         //fail test if not found
@@ -54,7 +56,7 @@ pub fn get_local_ips() -> Result<Vec<IpAddr>, ()> {
     Ok(ips)
 }
 #[allow(dead_code)]
-fn get_local_ifs() -> Result<Vec<Interface>, ()> {
+pub fn get_local_ifs() -> Result<Vec<Interface>, ()> {
     let ifs = if_addrs::get_if_addrs()
         .map_err(|err| {
             eprintln!("Error getting ips: {err}");
@@ -64,58 +66,4 @@ fn get_local_ifs() -> Result<Vec<Interface>, ()> {
         .filter(|iface| !iface.is_loopback())
         .collect();
     Ok(ifs)
-}
-
-#[cfg(test)]
-mod tests {
-    use std::time::{Instant, SystemTime, UNIX_EPOCH};
-
-    use super::*;
-    static TOTAL: usize = 100;
-    #[test]
-    fn get_own_ips() {
-        eprintln!("{:#?}", get_local_ips());
-        eprintln!("{:#?}", get_local_ifs());
-    }
-
-    #[test]
-    fn get_ports_mine() {
-        let start = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("should be able to get time");
-        let s = Instant::now();
-        let (t, _p) = get_tcp_port_keep_list().expect("should have available ports");
-        let mut a = vec![t];
-        for _ in 1..TOTAL {
-            let (t, _p) = get_tcp_port_keep_list().expect("should have available ports");
-            // eprintln!("{p:?}");
-            a.push(t);
-        }
-        let end = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("should be able to get time");
-        let e = Instant::now();
-        eprintln!("time taken SystemTime: {:?}", end - start);
-        eprintln!("time taken Instant: {:?}", e - s);
-    }
-    #[test]
-    fn get_ports_os() {
-        let start = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("should be able to get time");
-        let s = Instant::now();
-        let t = get_tcp_port().expect("should have available ports");
-        let mut a = vec![t];
-        for _ in 1..TOTAL {
-            let t = get_tcp_port().expect("should have available ports");
-            // eprintln!("{t:?}");
-            a.push(t);
-        }
-        let end = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("should be able to get time");
-        let e = Instant::now();
-        eprintln!("time taken SystemTime: {:?}", end - start);
-        eprintln!("time taken Instant: {:?}", e - s);
-    }
 }

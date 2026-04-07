@@ -33,21 +33,33 @@ impl Registry {
         Registry::new(1099)
     }
 
-    pub fn get_addr(&self, port: u16) -> SocketAddr {
+    pub fn get_host_address(&self, port: u16) -> Result<SocketAddr, ()> {
         // this will be slower than just saving it
-        let ips = get_local_ips().expect("Should have at least 1 IP. Todo: handle eth/ib");
-        let ip = ips[0];
-        SocketAddr::new(ip, port)
+        let ips = get_local_ips().map_err(|e| eprintln!("Error getting local ip: {e:?}"));
+        //TODO: handle multiple ips case
+        match ips {
+            Ok(ips) => {
+                let ip = ips[0];
+                Ok(SocketAddr::new(ip, port))
+            }
+            Err(_) => Err(()),
+        }
     }
 
     pub fn remove(&self, name: &str) -> RMIResult<()> {
-        let mut names = self.names.lock().unwrap();
+        let mut names = self
+            .names
+            .lock()
+            .expect("Registry: unable to get names lock");
         let id = names
             .get(name)
             .cloned()
             .ok_or(RMIError::NameNotFound(name.to_string()))?;
         names.remove(name);
-        let mut objects = self.objects.lock().unwrap();
+        let mut objects = self
+            .objects
+            .lock()
+            .expect("Registry: unable to get objects lock");
         let _sk = objects.remove(&id).ok_or(RMIError::ObjectNotFound(id))?;
         // todo!("make sure the object is also droped");
         // let left = objects.keys().count();
@@ -59,7 +71,10 @@ impl Registry {
 
     pub fn get(&self, id: &RMI_ID) -> RMIResult<Arc<Skeleton>> {
         //! RMI_ID -> Skeleton | for server
-        let objects = self.objects.lock().unwrap();
+        let objects = self
+            .objects
+            .lock()
+            .expect("Registry: unable to get objects lock");
         objects
             .get(id)
             .cloned()
@@ -69,19 +84,30 @@ impl Registry {
     #[remote]
     pub fn lookup(&self, name: &str) -> RMIResult<RemoteRef> {
         //! name -> remote ref | for client
-        let names = self.names.lock().unwrap();
+        let names = self
+            .names
+            .lock()
+            .expect("Registry: unable to get names lock");
         let id = names
             .get(name)
             .ok_or(RMIError::NameNotFound(name.to_string()))?;
         let skeleton = self.get(id)?;
         let port = skeleton.listen()?;
-        let addr = self.get_addr(port);
+        let addr = self
+            .get_host_address(port)
+            .map_err(|_| RMIError::TransportError("Cannot get local ip".to_string()))?;
         Ok(RemoteRef { addr, id: *id })
     }
 
     #[remote]
     pub fn list(&self) -> RMIResult<Vec<String>> {
-        let names: Vec<String> = self.names.lock().unwrap().keys().cloned().collect();
+        let names: Vec<String> = self
+            .names
+            .lock()
+            .expect("Registry: unable to get names lock")
+            .keys()
+            .cloned()
+            .collect();
         match names.len() {
             0 => RMIResult::Err(RMIError::EmptyRegistry()),
             _ => RMIResult::Ok(names),
@@ -94,8 +120,14 @@ impl Registry {
         // let skeleton = Arc::new(object);
         let skeleton = Arc::new(Skeleton::new(Arc::new(object)));
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
-        self.objects.lock().unwrap().insert(id, skeleton);
-        self.names.lock().unwrap().insert(name.to_string(), id);
+        self.objects
+            .lock()
+            .expect("Registry: unable to get objects lock")
+            .insert(id, skeleton);
+        self.names
+            .lock()
+            .expect("Registry: unable to get names lock")
+            .insert(name.to_string(), id);
         eprintln!("Registered {id}: {name}");
         id
     }
@@ -108,7 +140,7 @@ impl Registry {
 
 pub fn create_registry(port: u16) -> Arc<Registry> {
     let reg = Arc::new(Registry::new(port));
-    let port = reg.listen().expect("Registry should be able to listen");
+    let port = reg.listen().expect("Registry: unable to start listening");
     eprintln!("RMI Registry listening on {}", port);
     reg
 }
@@ -127,10 +159,14 @@ impl Registry {
     pub fn listen(self: &Arc<Self>) -> RMIResult<u16> {
         // takes an arc reference to self Arc<Registry>
         // clone and move to a listening thread
-        let listener = TcpListener::bind(("0.0.0.0", self.port))
-            .map_err(|e| RMIError::TransportError(e.to_string()))?;
+        let listener = TcpListener::bind(("0.0.0.0", self.port)).map_err(|e| {
+            eprintln!("Registry Error: cannot bind port {e}");
+            RMIError::TransportError(e.to_string())
+        })?;
         let self_clone = Arc::clone(&self);
-        let addr = listener.local_addr().expect("Registry should have address");
+        let addr = listener
+            .local_addr()
+            .expect("Registry: does not have an address");
         std::thread::spawn(move || {
             for stream in listener.incoming() {
                 match stream {

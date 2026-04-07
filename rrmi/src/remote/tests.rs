@@ -28,7 +28,9 @@ mod tests {
     fn addr() {
         let reg = Registry::default();
         let port = reg.port;
-        let addr = reg.get_addr(port);
+        let addr = reg
+            .get_host_address(port)
+            .expect("Registry failed to get local address");
         let ip = get_local_ips().expect("Should be able to get ips")[0];
         assert_eq!(addr, SocketAddr::new(ip, port))
     }
@@ -47,7 +49,7 @@ mod tests {
             pool.execute(move || {
                 for n in 0..per_thread {
                     let name = format!("{thread}-{n}");
-                    let guard = r.lock().unwrap();
+                    let guard = r.lock().expect("should be able to lock");
                     guard.bind(&name, MockRemoteObject::silent());
                     drop(guard);
                 }
@@ -55,7 +57,12 @@ mod tests {
         }
 
         std::thread::sleep(time::Duration::from_millis(100));
-        let num_objects = reg.lock().unwrap().list().unwrap().len();
+        let num_objects = reg
+            .lock()
+            .expect("should be able to lock")
+            .list()
+            .expect("should not be empty")
+            .len();
         eprintln!("Num objects after populating {}", num_objects);
         assert_eq!(num_objects, jobs * per_thread);
 
@@ -64,7 +71,7 @@ mod tests {
             let r = Arc::clone(&reg);
             pool.execute(move || {
                 for n in 0..per_thread {
-                    let guard = r.lock().unwrap();
+                    let guard = r.lock().expect("should be able to lock");
                     let name = format!("{thread}-{n}");
                     guard.remove(&name).expect("should still have this process");
                     drop(guard);
@@ -73,7 +80,7 @@ mod tests {
         }
 
         std::thread::sleep(time::Duration::from_millis(100));
-        let names = reg.lock().unwrap().list();
+        let names = reg.lock().expect("should be able to lock").list();
 
         match names {
             Result::Err(RMIError::EmptyRegistry()) => (),

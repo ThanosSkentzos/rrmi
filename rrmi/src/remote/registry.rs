@@ -8,6 +8,7 @@ use crate::transport::utils::{get_addr, get_local_ips};
 
 use rrmi_macros::remote_object;
 use std::collections::HashMap;
+use std::net::IpAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 pub struct Registry {
@@ -33,7 +34,18 @@ impl Registry {
         Registry::new(1099)
     }
 
-    pub fn get_host_address(&self, port: u16) -> Result<SocketAddr, ()> {
+    pub fn get_ip(&self) -> Result<IpAddr, ()> {
+        let ips = get_local_ips().map_err(|e| eprintln!("Error getting local ip: {e:?}"));
+        match ips {
+            Ok(ips) => {
+                let ip = ips[0];
+                Ok(ip)
+            }
+            Err(_) => Err(()),
+        }
+    }
+
+    pub fn construct_addr(&self, port: u16) -> Result<SocketAddr, ()> {
         // this will be slower than just saving it
         let ips = get_local_ips().map_err(|e| eprintln!("Error getting local ip: {e:?}"));
         //TODO: handle multiple ips case
@@ -94,7 +106,7 @@ impl Registry {
         let skeleton = self.get(id)?;
         let port = skeleton.listen()?;
         let addr = self
-            .get_host_address(port)
+            .construct_addr(port)
             .map_err(|_| RMIError::TransportError("Cannot get local ip".to_string()))?;
         Ok(RemoteRef { addr, id: *id })
     }
@@ -116,8 +128,6 @@ impl Registry {
 
     pub fn bind(&self, name: &str, object: impl RemoteObject + 'static) -> RMI_ID {
         // bind a skelton to the registry
-        //TODO: object is a skeleton
-        // let skeleton = Arc::new(object);
         let skeleton = Arc::new(Skeleton::new(Arc::new(object)));
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
         self.objects
@@ -137,7 +147,24 @@ impl Registry {
         // switch variable to unbind
     }
 }
-
+/// Creates and exports a Registry instance on the local host that accepts requests on the specified port.
+///
+/// Parameters:
+/// port: `u16` the port on which the registry accepts requests
+///
+/// Returns:
+/// the registry
+///
+/// ```
+/// // create registry
+/// use rrmi::{get_registry,create_registry};
+/// let port: u16 = 1099;
+/// let local = "localhost";
+/// let reg = create_registry(port);
+/// // check that is has the right port
+/// assert_eq!(port,reg.port);
+///
+/// ```
 pub fn create_registry(port: u16) -> Arc<Registry> {
     let reg = Arc::new(Registry::new(port));
     let port = reg.listen().expect("Registry: unable to start listening");
@@ -145,11 +172,34 @@ pub fn create_registry(port: u16) -> Arc<Registry> {
     reg
 }
 
+/// Returns a reference to the remote object Registry on the specified host and port
+///
+/// Parameters:
+///
+/// host: `&str` of host for the remote registry
+///
+/// port: `u16` port on which the registry accepts requests
+///
+/// Returns:
+///
+/// reference (a stub) to the remote object registry
+/// ```
+/// // create registry
+/// use rrmi::{get_registry,create_registry};
+/// let port: u16 = 1100;
+/// let local = "localhost";
+/// let reg = create_registry(port);
+/// let ip = reg.get_ip().expect("should have address");
+/// // access the registry
+/// let reg_local = get_registry(local,1099);
+/// let reg_remote = get_registry(&ip.to_string(),1099);
+///
+/// ```
+//TODO: should i check connection and throw error?
 pub fn get_registry(host: &str, port: u16) -> RegistryStub {
     let addr = get_addr(&host, port);
     let remote = RemoteRef::new(addr, 0);
     RegistryStub { remote }
-    // todo!("to do this I need to ask the registry for its reference and treat it like a skeleton")
 }
 
 use ::rrmi::RMIResult;

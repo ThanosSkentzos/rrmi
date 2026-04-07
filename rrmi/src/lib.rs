@@ -1,7 +1,7 @@
 pub mod remote;
 mod stub;
 use remote::RMI_ID;
-pub use remote::create_registry;
+pub use remote::{create_registry, get_registry};
 
 mod error;
 mod transport;

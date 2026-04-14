@@ -34,25 +34,25 @@ impl Skeleton {
                         .set_nodelay(true)
                         .map_err(|e| RMIError::TransportError(e.to_string()))
                         .expect("Could not set no_delay");
-                    // let mut buf = [0u8; 0];
+                    let mut buf = [0u8; 4];
                     loop {
-                        // match stream.peek(&mut buf) {
-                        //     Ok(0) => {
-                        //         eprintln!("Connection closed");
-                        //         break;
-                        //     }
-                        //     Ok(_) => (),
-                        //     Err(e) => match e.kind() {
-                        //         ErrorKind::ConnectionReset | ErrorKind::BrokenPipe => {
-                        //             eprintln!("Connection closed due to error: {e}")
-                        //         }
-                        //         k => eprintln!("Other error {e:?}"),
-                        //     },
-                        // };
+                        match stream.peek(&mut buf) {
+                            Ok(0) => {
+                                eprintln!("{:?}: Connection closed.", obj_clone.name());
+                                break;
+                            }
+                            Ok(_) => (),
+                            Err(e) => match e.kind() {
+                                ErrorKind::ConnectionReset | ErrorKind::BrokenPipe => {
+                                    eprintln!("Connection closed due to error: {e}")
+                                }
+                                _k => eprintln!("Connection error {e:?}"),
+                            },
+                        };
                         match obj_clone.run(&mut stream) {
                             Ok(_) => {}
                             Err(e) => {
-                                eprintln!("{:?} Connection closed: {e}", stream.peer_addr());
+                                eprintln!("{:?} Connection closed when running: {e}", stream.peer_addr());
                                 break;
                             }
                         }

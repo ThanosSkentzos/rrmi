@@ -37,7 +37,7 @@ pub fn receive_data(stream: &mut TcpStream) -> Vec<u8> {
     let _ = stream.read_exact(&mut bytes);
     bytes
 }
-
+#[allow(unused)]
 pub struct TcpClient {
     server_addr: SocketAddr,
     stream: RefCell<TcpStream>,

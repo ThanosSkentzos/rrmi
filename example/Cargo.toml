@@ -7,3 +7,4 @@ edition = "2021"
 rrmi = { path = "../rrmi" }
 rrmi_macros = { path = "../rrmi_macros" }
 serde = "1.0.228"
+thousands = "0.2"

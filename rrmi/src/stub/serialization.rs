@@ -10,7 +10,7 @@ pub fn marshal<T: Serialize>(data: &T) -> RMIResult<Vec<u8>> {
 }
 pub fn unmarshal<T: for<'de> Deserialize<'de>>(bytes: &Vec<u8>) -> RMIResult<T> {
     serde_cbor::from_slice(&bytes).map_err(|e| {
-        eprintln!("Unmarshaling error: {e}");
+        eprintln!("Unmarshaling error: {e} on bytes: {bytes:?}");
         RMIError::DeserializationError(e.to_string())
     })
 }

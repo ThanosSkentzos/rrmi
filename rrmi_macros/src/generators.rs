@@ -55,7 +55,7 @@ pub fn gen_stub(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
 
         let fn_contents = quote! {
             use ::rrmi::Transport;
-            let transport_client= ::rrmi::TcpClient::new(self.remote.addr);
+            let transport_client = &self.transport_client;
             let req = #req_name::#camel{
                 #(#param_names),*
             };
@@ -80,12 +80,15 @@ pub fn gen_stub(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
     });
     let stub_struct = quote! {
         pub struct #stub_name{
-            remote: ::rrmi::RemoteRef,
+            // remote: ::rrmi::RemoteRef,
+            transport_client: ::rrmi::TcpClient,
             stub_name: String,
         }
         impl From<::rrmi::Stub> for #stub_name{
             fn from(stub: ::rrmi::Stub) -> Self{
-                #stub_name{remote: stub.remote, stub_name: "#stub_name".into()}
+                let remote = stub.remote;
+                let transport_client = ::rrmi::TcpClient::new(remote.addr);
+                #stub_name{transport_client, stub_name: "#stub_name".into()}
             }
         }
     };

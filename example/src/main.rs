@@ -1,57 +1,55 @@
 use std::sync::atomic::Ordering::SeqCst;
+use std::sync::Barrier;
+use std::time::Instant;
 use std::{
     sync::atomic::{AtomicBool, AtomicU32, AtomicU8},
-    thread::{self, sleep},
+    sync::Mutex,
+    thread,
     time::Duration,
 };
 
-use rrmi::{
-    create_registry,
-    remote::{registry::get_registry, RemoteObject},
-};
+use rrmi::{create_registry, get_registry, remote::RemoteObject};
 use rrmi_macros::remote_object;
-struct Calculator;
+use thousands::Separable;
 
-#[remote_object]
-impl Calculator {
-    #[remote]
-    fn add(&self, a: i32, b: i32, _c: &str) -> i32 {
-        a + b
-    }
-    #[remote]
-    fn multiply(&self, a: i32, b: i32) -> i32 {
-        a * b
-    }
-    fn sub(&self, a: i32, b: i32) -> i32 {
-        a - b
-    }
-}
+#[allow(unused)]
 struct NumberServer {
     num: AtomicU32,
+    num2: Mutex<u32>,
     inbar: AtomicU8,
     total: u8,
     barrier_on: AtomicBool,
-    // bar: Barrier,
+    bar: Barrier,
 }
 
 #[remote_object]
 impl NumberServer {
     fn new(total: u8) -> Self {
         let num = 0.into();
-        // let bar = Barrier::new(total_nodes);
+        let num2 = Mutex::new(0);
+        let bar = Barrier::new(total as usize);
         let inbar = 0.into();
         let barrier_on = AtomicBool::new(false);
         Self {
             num,
+            num2,
             inbar,
             total,
             barrier_on,
+            bar,
         }
     }
     #[remote]
-    fn get_num(&self) -> u32 {
+    fn get_num_atomic(&self) -> u32 {
         self.num.fetch_add(1, SeqCst);
         self.num.load(SeqCst)
+    }
+
+    #[remote]
+    fn get_num_mutex(&self) -> u32 {
+        let mut num2 = self.num2.lock().unwrap();
+        *num2 += 1;
+        *num2
     }
     #[remote]
     fn barrier(&self) -> () {
@@ -70,7 +68,7 @@ impl NumberServer {
             if status == false {
                 break;
             }
-            sleep(Duration::from_nanos(1));
+            thread::sleep(Duration::from_nanos(1));
         }
         // self.bar.wait();
         // eprintln!("{tid:?} escaped!")
@@ -78,11 +76,13 @@ impl NumberServer {
 }
 
 fn run_thread(stub: &NumberServerStub, char: &str) {
-    let times = 10000;
+    let times = 333333;
+    let barrier_count = 10000;
     let _ = stub.barrier();
     for i in 0..times {
-        _ = stub.get_num().expect("should be able to get number");
-        if i % 1000 == 0 {
+        _ = stub.get_num_atomic().expect("should be able to get number");
+        if i % barrier_count == 0 {
+            _ = stub.get_num_mutex().expect("same");
             eprint!("{char}");
             _ = stub.barrier();
             if char == "A" {
@@ -91,51 +91,77 @@ fn run_thread(stub: &NumberServerStub, char: &str) {
         }
     }
 }
+
 fn main() {
-    let cal = Calculator;
-    let (a, b, c) = (1, 2, "test");
-    cal.add(a, b, "test");
-    cal.multiply(a, b);
-    cal.sub(a, b);
+    // let cal = Calculator;
+    // let (a, b, c) = (1, 2, "test");
+    // cal.add(a, b, "test");
+    // cal.multiply(a, b);
+    // cal.sub(a, b);
 
     let port = 1099;
+    eprintln!("Creating Registry");
     let registry = create_registry(port);
-    let name = "calc";
-    registry.bind(name, cal);
+    eprintln!("Getting RegistryStub");
     let reg = get_registry("localhost", port);
-    let calc: CalculatorStub = reg
-        .lookup(name)
-        .expect("Should be able to get object")
-        .into();
-    let _res = calc.add(a, b, c);
+
+    // let name = "calc";
+    // registry.bind(name, cal);
+    // let calc: CalculatorStub = reg
+    //     .lookup(name)
+    //     .expect("Should be able to get object")
+    //     .into();
+    // let _res = calc.add(a, b, c);
 
     let numserver = NumberServer::new(3);
-    let from_obj = numserver.get_num();
+    eprintln!("Binding NumberServer");
     registry.bind("NumberServer", numserver);
+
+    let t = Instant::now();
 
     let stub = reg
         .lookup("NumberServer")
-        .expect("should be able to get object")
+        .expect("stub lookup failed")
         .into();
-    thread::spawn(move || {
-        let stub = reg
-            .lookup("NumberServer")
-            .expect("should be able to get object")
-            .into();
-        run_thread(&stub, "A");
-    });
-    let reg = get_registry("localhost", port);
-    thread::spawn(move || {
-        let stub = reg
-            .lookup("NumberServer")
-            .expect("should be able to get object")
-            .into();
-        run_thread(&stub, "B");
-    });
+    eprintln!("Making thread A");
+    let ahandle = thread::Builder::new()
+        .name("A".to_string())
+        .spawn(move || {
+            let reg = get_registry("localhost", port);
+            let stub = reg
+                .lookup("NumberServer")
+                .expect("stub lookup failed")
+                .into();
+            run_thread(&stub, "A");
+        })
+        .expect("Could not spawn thread A");
+    eprintln!("Making thread B");
+    let bhandle = thread::Builder::new()
+        .name("B".to_string())
+        .spawn(move || {
+            let reg = get_registry("localhost", port);
+            let stub = reg
+                .lookup("NumberServer")
+                .expect("stub lookup failed")
+                .into();
+            run_thread(&stub, "B");
+        })
+        .expect("Could not spawn thread B");
     run_thread(&stub, "C");
     thread::sleep(Duration::from_millis(100));
-    let from_stub = stub.get_num().expect("should be able to get number");
-    eprintln!("Number from object: {from_obj} - from stub: {from_stub}");
+    ahandle.join().expect("thread did not join");
+    bhandle.join().expect("thread did not join");
+    let atomic = stub.get_num_atomic().expect("stub get_num failed");
+    let mutex = stub.get_num_mutex().expect("stub get_num failed");
+    let time = t.elapsed();
+
+    eprintln!(
+        "Total atomic: {} & mutex: {}",
+        atomic.separate_with_underscores(),
+        mutex.separate_with_underscores()
+    );
+    eprintln!("Total time: {:?}", t.elapsed());
+    eprintln!("Average: {:?}", time / atomic);
 
     // stb.run_stub();
 }

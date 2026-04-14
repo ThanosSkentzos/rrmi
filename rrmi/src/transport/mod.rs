@@ -24,7 +24,7 @@ impl Default for RMIRequest {
     }
 }
 
-pub trait Transport: Send + Sync {
+pub trait Transport {
     fn send<
         REQ: Serialize + for<'de> Deserialize<'de>,
         RES: Serialize + for<'de> Deserialize<'de>,

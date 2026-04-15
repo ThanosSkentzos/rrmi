@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crate::RMIError;
 use crate::remote::{RMIResult, RemoteObject};
-use crate::transport::utils::get_tcp_socket;
+use crate::transport::utils::get_tcp_socket_os;
 
 pub struct Skeleton {
     object: Arc<dyn RemoteObject>, // Arc because eventually we to listen from several ports
@@ -14,7 +14,7 @@ impl Skeleton {
         Skeleton { object }
     }
     pub fn listen(&self) -> RMIResult<u16> {
-        let listener = get_tcp_socket()?;
+        let listener = get_tcp_socket_os()?;
         let obj_clone = Arc::clone(&self.object);
         let object_name = obj_clone.name();
         let addr = listener

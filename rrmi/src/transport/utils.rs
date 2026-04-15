@@ -9,7 +9,7 @@ static START: u16 = 31768;
 #[allow(dead_code)]
 static END: u16 = 60999;
 #[allow(dead_code)]
-pub fn get_tcp_socket_manual() -> RMIResult<(TcpListener, u16)> {
+pub fn get_tcp_socket_linear() -> RMIResult<(TcpListener, u16)> {
     for port in START..END {
         match TcpListener::bind(("0.0.0.0", port)) {
             Ok(l) => return Ok((l, port)),
@@ -18,7 +18,7 @@ pub fn get_tcp_socket_manual() -> RMIResult<(TcpListener, u16)> {
     }
     Err(RMIError::TransportError("No available ports".to_string()))
 }
-pub fn get_tcp_socket() -> RMIResult<TcpListener> {
+pub fn get_tcp_socket_os() -> RMIResult<TcpListener> {
     TcpListener::bind(("0.0.0.0", 0)).map_err(|e| RMIError::TransportError(e.to_string()))
 }
 

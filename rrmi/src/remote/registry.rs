@@ -6,11 +6,16 @@ use crate::stub::Skeleton;
 use crate::transport::SocketAddr;
 use crate::transport::utils::{get_addr, get_local_ips};
 
-use rrmi_macros::remote_object;
+// use rrmi_macros::remote_object;
 use std::collections::HashMap;
 use std::net::IpAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+
+#[cfg(debug_assertions)]
+use tracing::instrument;
+
+#[derive(Debug)]
 pub struct Registry {
     // a hashmap with all objects
     pub port: u16,
@@ -18,7 +23,7 @@ pub struct Registry {
     names: Arc<Mutex<HashMap<String, RMI_ID>>>,
     next_id: Arc<AtomicUsize>,
 }
-#[remote_object]
+// #[remote_object]
 impl Registry {
     fn new(port: u16) -> Self {
         Registry {
@@ -34,6 +39,7 @@ impl Registry {
         Registry::new(1099)
     }
 
+    #[cfg_attr(debug_assertions, instrument)]
     pub fn get_ip(&self) -> Result<IpAddr, ()> {
         let ips = get_local_ips().map_err(|e| eprintln!("Error getting local ip: {e:?}"));
         match ips {
@@ -45,6 +51,7 @@ impl Registry {
         }
     }
 
+    #[cfg_attr(debug_assertions, instrument)]
     pub fn construct_addr(&self, port: u16) -> Result<SocketAddr, ()> {
         // this will be slower than just saving it
         let ips = get_local_ips().map_err(|e| eprintln!("Error getting local ip: {e:?}"));
@@ -58,6 +65,7 @@ impl Registry {
         }
     }
 
+    #[cfg_attr(debug_assertions, instrument)]
     pub fn remove(&self, name: &str) -> RMIResult<()> {
         let mut names = self
             .names
@@ -81,6 +89,7 @@ impl Registry {
         Ok(())
     }
 
+    #[cfg_attr(debug_assertions, instrument)]
     pub fn get(&self, id: &RMI_ID) -> RMIResult<Arc<Skeleton>> {
         //! RMI_ID -> Skeleton | for server
         let objects = self
@@ -93,7 +102,8 @@ impl Registry {
             .ok_or(RMIError::ObjectNotFound(*id))
     }
 
-    #[remote]
+    // #[remote]
+    #[cfg_attr(debug_assertions, instrument)]
     pub fn lookup(&self, name: &str) -> RMIResult<RemoteRef> {
         //! name -> remote ref | for client
         let names = self
@@ -111,7 +121,8 @@ impl Registry {
         Ok(RemoteRef { addr, id: *id })
     }
 
-    #[remote]
+    // #[remote]
+    #[cfg_attr(debug_assertions, instrument)]
     pub fn list(&self) -> RMIResult<Vec<String>> {
         let names: Vec<String> = self
             .names
@@ -165,6 +176,7 @@ impl Registry {
 /// assert_eq!(port,reg.port);
 ///
 /// ```
+#[cfg_attr(debug_assertions, instrument)]
 pub fn create_registry(port: u16) -> Arc<Registry> {
     let reg = Arc::new(Registry::new(port));
     let port = reg.listen().expect("Registry: unable to start listening");
@@ -196,6 +208,7 @@ pub fn create_registry(port: u16) -> Arc<Registry> {
 ///
 /// ```
 //TODO: should i check connection and throw error?
+#[cfg_attr(debug_assertions, instrument)]
 pub fn get_registry(host: &str, port: u16) -> RegistryStub {
     let addr = get_addr(&host, port);
     let remote = RemoteRef::new(addr, 0);
@@ -206,6 +219,7 @@ use ::rrmi::RMIResult;
 use ::rrmi::transport::TcpListener;
 
 impl Registry {
+    #[cfg_attr(debug_assertions, instrument)]
     pub fn listen(self: &Arc<Self>) -> RMIResult<u16> {
         // takes an arc reference to self Arc<Registry>
         // clone and move to a listening thread
@@ -217,49 +231,63 @@ impl Registry {
         let addr = listener
             .local_addr()
             .expect("Registry: does not have an address");
-        std::thread::spawn(move || {
-            for stream in listener.incoming() {
-                match stream {
-                    Ok(mut stream) => {
-                        eprintln!("Registry received connection from {:?}", stream.peer_addr());
-                        if let Err(e) = self_clone.run(&mut stream) {
-                            eprintln!("Error: {e} when handling connection");
+        let _handle_registry = std::thread::Builder::new()
+            .name("Registry".to_string())
+            .spawn(move || {
+                for stream in listener.incoming() {
+                    match stream {
+                        Ok(mut stream) => {
+                            eprintln!("Registry received connection from {:?}", stream.peer_addr());
+                            if let Err(e) = self_clone.run(&mut stream) {
+                                eprintln!("Error: {e} when handling connection");
+                            }
                         }
-                    }
-                    Err(e) => eprintln!("Transport error: {e}"),
-                };
-            }
-        });
+                        Err(e) => eprintln!("Transport error: {e}"),
+                    };
+                }
+            })
+            .expect("Registry thread failed");
         Ok(addr.port())
     }
 }
 
-// Following code will be generated from the proc-macro
+// Remote object code
+// this could also be generated from the macro
 use ::rrmi::stub::{Deserialize, Serialize, Stub};
 use ::rrmi::transport::{TcpClient, TcpStream, Transport};
 use rrmi::{marshal, receive_data, send_data, unmarshal};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum RegistryRequest {
     Lookup { name: String },
     List,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum RegistryResponse {
     Lookup(RMIResult<RemoteRef>),
     List(RMIResult<Vec<String>>),
 }
 
+impl RemoteObject for Registry {
+    fn run(&self, stream: &mut TcpStream) -> RMIResult<()> {
+        self.handle_connection(stream)
+    }
+    fn name(&self) -> &'static str {
+        "Registry"
+    }
+}
 #[allow(dead_code)]
 impl Registry {
-    fn handle_connection(&self, mut stream: TcpStream) -> RMIResult<()> {
-        let request_bytes = receive_data(&mut stream);
+    #[cfg_attr(debug_assertions, instrument)]
+    fn handle_connection(&self, stream: &mut TcpStream) -> RMIResult<()> {
+        let request_bytes = receive_data(stream);
         let request: RegistryRequest = unmarshal(&request_bytes)?;
         let response: RegistryResponse = self.handle_request(request);
         let response_bytes = marshal(&response)?;
-        send_data(response_bytes, &mut stream)
+        send_data(response_bytes, stream)
     }
+    #[cfg_attr(debug_assertions, instrument)]
     fn handle_request(&self, req: RegistryRequest) -> RegistryResponse {
         match req {
             RegistryRequest::Lookup { name } => RegistryResponse::Lookup(self.lookup(&name)),
@@ -268,6 +296,7 @@ impl Registry {
     }
 }
 
+#[derive(Debug)]
 pub struct RegistryStub {
     remote: RemoteRef,
 }
@@ -276,6 +305,7 @@ impl RegistryStub {
         RegistryStub { remote }
     }
 
+    #[cfg_attr(debug_assertions, instrument)]
     pub fn lookup(&self, name: &str) -> RMIResult<Stub> {
         let transport = TcpClient::new(self.remote.addr);
         let req = RegistryRequest::Lookup {
@@ -287,6 +317,7 @@ impl RegistryStub {
             _ => Err(RMIError::TransportError("Wrong response".to_string())),
         }
     }
+    #[cfg_attr(debug_assertions, instrument)]
     pub fn list(&self) -> RMIResult<Vec<String>> {
         let transport = TcpClient::new(self.remote.addr);
         let req = RegistryRequest::List {};

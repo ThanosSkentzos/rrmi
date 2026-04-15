@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use std::io::ErrorKind;
 use std::sync::Arc;
 
@@ -21,7 +22,8 @@ impl Skeleton {
             .local_addr()
             .expect(&format!("{object_name}: does not have an address"));
         eprintln!("{object_name} uses address: {addr}");
-        std::thread::spawn(move || {
+        let name = format!("Skeleton{object_name}");
+        let _handle_skeleton = std::thread::Builder::new().name(name).spawn(move || {
             // for stream in listener.incoming() {
             let stream = listener.accept();
             match stream {
@@ -52,7 +54,10 @@ impl Skeleton {
                         match obj_clone.run(&mut stream) {
                             Ok(_) => {}
                             Err(e) => {
-                                eprintln!("{:?} Connection closed when running: {e}", stream.peer_addr());
+                                eprintln!(
+                                    "{:?} Connection closed when running: {e}",
+                                    stream.peer_addr()
+                                );
                                 break;
                             }
                         }
@@ -66,4 +71,9 @@ impl Skeleton {
     }
 }
 
+impl Debug for Skeleton {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Skeleton[{:?}]", self.object.name())
+    }
+}
 //#TODO tests

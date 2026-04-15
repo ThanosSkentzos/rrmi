@@ -76,8 +76,8 @@ pub fn gen_stub(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
             } }
         };
         quote! {#fn_call}
-        // quote! {fn #method_name()->(){}}
     });
+
     let stub_struct = quote! {
         pub struct #stub_name{
             // remote: ::rrmi::RemoteRef,
@@ -94,6 +94,7 @@ pub fn gen_stub(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
     };
 
     quote! {
+        #[cfg_attr(debug_assertions, derive(Debug))]
         #stub_struct
         impl #stub_name{
         #(#functions)*
@@ -104,6 +105,7 @@ pub fn gen_stub(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
 pub fn gen_handle_connection(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
     let (req_name, res_name) = remote_obj.get_enum_names();
     quote! {
+        #[cfg_attr(debug_assertions, ::tracing::instrument)]
         fn handle_connection_gen(&self, stream: &mut ::rrmi::TcpStream) -> ::rrmi::RMIResult<()> {
             let request_bytes = ::rrmi::receive_data(stream);
             let request: #req_name = ::rrmi::unmarshal(&request_bytes)?;
@@ -143,6 +145,7 @@ pub fn gen_handle_request(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
         quote! { #pattern => #res_name::#camel(#call)}
     });
     quote! {
+        #[cfg_attr(debug_assertions, ::tracing::instrument)]
         fn handle_request_gen(&self, req: #req_name) -> #res_name{
             match req{
                 #(#match_arms),*
@@ -185,19 +188,21 @@ pub fn gen_enums(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
 
     let enums = quote! {
         #[derive(serde::Serialize,serde::Deserialize)]
+        #[cfg_attr(debug_assertions, derive(Debug))]
         pub enum #req_name{
             #(#req_variants),*
         }
 
         #[derive(serde::Serialize,serde::Deserialize)]
+        #[cfg_attr(debug_assertions, derive(Debug))]
         pub enum #res_name{
             #(#res_variants),*
         }
     };
 
-    if remote_obj.struct_name.0 == "MockRemoteObject" {
-        return quote! {#enums};
-    }
+    // if remote_obj.struct_name.0 == "MockRemoteObject" {
+    //     return quote! {#enums};
+    // }
     quote! {
         #enums
     }

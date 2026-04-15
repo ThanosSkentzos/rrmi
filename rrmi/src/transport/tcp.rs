@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::fmt::Debug;
 use std::io::{Read, Write};
 pub use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 
@@ -9,6 +10,10 @@ use crate::remote::RMIResult;
 use crate::stub::{marshal, unmarshal};
 use crate::transport::Transport;
 
+#[cfg(debug_assertions)]
+use tracing::instrument;
+
+#[cfg_attr(debug_assertions, instrument)]
 pub fn send_data(data_serial: Vec<u8>, stream: &mut TcpStream) -> RMIResult<()> {
     let len = data_serial.len() as u32;
     let _ = stream.write_all(&len.to_be_bytes()).map_err(|e| {
@@ -26,7 +31,7 @@ pub fn send_data(data_serial: Vec<u8>, stream: &mut TcpStream) -> RMIResult<()> 
     // eprintln!("tcp data sent");
     Ok(())
 }
-
+#[cfg_attr(debug_assertions, instrument)]
 pub fn receive_data(stream: &mut TcpStream) -> Vec<u8> {
     let mut len_bytes = [0u8; 4];
     let _ = stream.read_exact(&mut len_bytes);
@@ -38,6 +43,7 @@ pub fn receive_data(stream: &mut TcpStream) -> Vec<u8> {
     bytes
 }
 #[allow(unused)]
+#[derive(Debug)]
 pub struct TcpClient {
     server_addr: SocketAddr,
     stream: RefCell<TcpStream>,
@@ -60,6 +66,32 @@ impl TcpClient {
         }
     }
 }
+#[cfg(debug_assertions)]
+impl Transport for TcpClient {
+    fn send<
+        REQ: Serialize + for<'de> Deserialize<'de> + Debug,
+        RES: Serialize + for<'de> Deserialize<'de> + Debug,
+    >(
+        &self,
+        req: REQ,
+    ) -> RMIResult<RES> {
+        // eprintln!("marshaling");
+        let request_serialized = marshal(&req)?;
+        // eprintln!("send_data");
+        let mut stream = self.stream.borrow_mut();
+        send_data(request_serialized, &mut stream).map_err(|e| {
+            eprintln!("send_data failed: {e:?}");
+            e
+        })?;
+        // eprintln!("receive_data");
+        let response_bytes = receive_data(&mut stream);
+        // eprintln!("unmarshaling");
+        let response: RES = unmarshal(&response_bytes)?;
+        Ok(response)
+    }
+}
+
+#[cfg(not(debug_assertions))]
 impl Transport for TcpClient {
     fn send<
         REQ: Serialize + for<'de> Deserialize<'de>,

@@ -1,6 +1,8 @@
 mod tcp;
 mod tests;
 pub mod utils;
+use std::fmt::Debug;
+
 use crate::RMI_ID;
 use crate::remote::RMIResult;
 use crate::stub::{Deserialize, Serialize};
@@ -24,6 +26,18 @@ impl Default for RMIRequest {
     }
 }
 
+#[cfg(debug_assertions)]
+pub trait Transport {
+    fn send<
+        REQ: Serialize + for<'de> Deserialize<'de> + Debug,
+        RES: Serialize + for<'de> Deserialize<'de> + Debug,
+    >(
+        &self,
+        req: REQ,
+    ) -> RMIResult<RES>;
+}
+
+#[cfg(not(debug_assertions))]
 pub trait Transport {
     fn send<
         REQ: Serialize + for<'de> Deserialize<'de>,

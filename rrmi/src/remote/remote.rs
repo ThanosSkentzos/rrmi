@@ -25,16 +25,19 @@ impl RemoteRef {
 }
 
 pub trait RemoteObject: Send + Sync {
+    fn run(&self, stream: &mut TcpStream) -> RMIResult<()>;
+
+    fn name(&self) -> &'static str;
+
     // fn listen(self: &Arc<Self>) -> RMIResult<u16>;
     // CANNOT USE AS DYNAMIC WITH &Arc ref
 
-    fn run(&self, stream: &mut TcpStream) -> RMIResult<()>;
-    fn name(&self) -> &'static str;
     // fn handle_request<ObjReq, ObjRes>(&self, req: ObjReq) -> ObjRes;
     //CANNOT USE AS DYNAMIC WITH generic types
 }
 
 #[allow(dead_code)]
+#[derive(Debug)]
 pub struct MockRemoteObject {
     verbose: bool,
 }

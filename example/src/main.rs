@@ -12,7 +12,18 @@ use rrmi::{create_registry, get_registry, remote::RemoteObject};
 use rrmi_macros::remote_object;
 use thousands::Separable;
 
+//=============================TRACING============================
+
+#[cfg(debug_assertions)]
+use tracing::instrument;
+#[cfg(debug_assertions)]
+use tracing_chrome::ChromeLayerBuilder;
+#[cfg(debug_assertions)]
 #[allow(unused)]
+use tracing_subscriber::{prelude::*, registry::Registry};
+
+#[allow(unused)]
+#[cfg_attr(debug_assertions, derive(Debug))]
 struct NumberServer {
     num: AtomicU32,
     num2: Mutex<u32>,
@@ -24,6 +35,7 @@ struct NumberServer {
 
 #[remote_object]
 impl NumberServer {
+    #[cfg_attr(debug_assertions, instrument)]
     fn new(total: u8) -> Self {
         let num = 0.into();
         let num2 = Mutex::new(0);
@@ -40,18 +52,21 @@ impl NumberServer {
         }
     }
     #[remote]
+    #[cfg_attr(debug_assertions, instrument)]
     fn get_num_atomic(&self) -> u32 {
         self.num.fetch_add(1, SeqCst);
         self.num.load(SeqCst)
     }
 
     #[remote]
+    #[cfg_attr(debug_assertions, instrument)]
     fn get_num_mutex(&self) -> u32 {
         let mut num2 = self.num2.lock().unwrap();
         *num2 += 1;
         *num2
     }
     #[remote]
+    #[cfg_attr(debug_assertions, instrument)]
     fn barrier(&self) -> () {
         // let tid = thread::current().id();
         // eprintln!("{tid:?} joins the barrier ");
@@ -75,8 +90,9 @@ impl NumberServer {
     }
 }
 
+#[cfg_attr(debug_assertions, instrument)]
 fn run_thread(stub: &NumberServerStub, char: &str) {
-    let times = 333333;
+    let times = 33333;
     let barrier_count = 10000;
     let _ = stub.barrier();
     for i in 0..times {
@@ -91,13 +107,24 @@ fn run_thread(stub: &NumberServerStub, char: &str) {
         }
     }
 }
+#[cfg_attr(debug_assertions, instrument)]
+fn run_thread_a(stub: &NumberServerStub) {
+    run_thread(stub, "A");
+}
+#[cfg_attr(debug_assertions, instrument)]
+fn run_thread_b(stub: &NumberServerStub) {
+    run_thread(stub, "B");
+}
+#[cfg_attr(debug_assertions, instrument)]
+fn run_thread_c(stub: &NumberServerStub) {
+    run_thread(stub, "C");
+}
 
 fn main() {
-    // let cal = Calculator;
-    // let (a, b, c) = (1, 2, "test");
-    // cal.add(a, b, "test");
-    // cal.multiply(a, b);
-    // cal.sub(a, b);
+    #[cfg(debug_assertions)]
+    let (chrome_layer, _guard) = ChromeLayerBuilder::new().build();
+    #[cfg(debug_assertions)]
+    tracing_subscriber::registry().with(chrome_layer).init();
 
     let port = 1099;
     eprintln!("Creating Registry");
@@ -105,52 +132,56 @@ fn main() {
     eprintln!("Getting RegistryStub");
     let reg = get_registry("localhost", port);
 
-    // let name = "calc";
-    // registry.bind(name, cal);
-    // let calc: CalculatorStub = reg
-    //     .lookup(name)
-    //     .expect("Should be able to get object")
-    //     .into();
-    // let _res = calc.add(a, b, c);
-
     let numserver = NumberServer::new(3);
     eprintln!("Binding NumberServer");
     registry.bind("NumberServer", numserver);
 
     let t = Instant::now();
 
-    let stub = reg
-        .lookup("NumberServer")
-        .expect("stub lookup failed")
-        .into();
     eprintln!("Making thread A");
     let ahandle = thread::Builder::new()
-        .name("A".to_string())
+        .name("Thread A".to_string())
         .spawn(move || {
             let reg = get_registry("localhost", port);
             let stub = reg
                 .lookup("NumberServer")
                 .expect("stub lookup failed")
                 .into();
-            run_thread(&stub, "A");
+            run_thread_a(&stub);
         })
         .expect("Could not spawn thread A");
     eprintln!("Making thread B");
     let bhandle = thread::Builder::new()
-        .name("B".to_string())
+        .name("Thread B".to_string())
         .spawn(move || {
             let reg = get_registry("localhost", port);
             let stub = reg
                 .lookup("NumberServer")
                 .expect("stub lookup failed")
                 .into();
-            run_thread(&stub, "B");
+            run_thread_b(&stub);
         })
-        .expect("Could not spawn thread B");
-    run_thread(&stub, "C");
-    thread::sleep(Duration::from_millis(100));
+        .expect("Could not spawn thread A");
+    eprintln!("Making thread C");
+    let chandle = thread::Builder::new()
+        .name("Thread C".to_string())
+        .spawn(move || {
+            let reg = get_registry("localhost", port);
+            let stub = reg
+                .lookup("NumberServer")
+                .expect("stub lookup failed")
+                .into();
+            run_thread_c(&stub);
+        })
+        .expect("Could not spawn thread C");
+    let stub: NumberServerStub = reg
+        .lookup("NumberServer")
+        .expect("stub lookup failed")
+        .into();
     ahandle.join().expect("thread did not join");
     bhandle.join().expect("thread did not join");
+    chandle.join().expect("thread did not join");
+
     let atomic = stub.get_num_atomic().expect("stub get_num failed");
     let mutex = stub.get_num_mutex().expect("stub get_num failed");
     let time = t.elapsed();

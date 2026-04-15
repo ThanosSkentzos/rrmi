@@ -1,3 +1,6 @@
 target
 pa1
 Cargo.lock
+trace*
+flamegraph*
+perf*.data*

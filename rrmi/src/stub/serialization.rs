@@ -1,13 +1,34 @@
+#[cfg(debug_assertions)]
+use std::fmt::Debug;
+
 use crate::error::RMIError;
 use crate::remote::RMIResult;
 pub use serde::{Deserialize, Serialize};
 
+#[cfg(debug_assertions)]
+use tracing::instrument;
+
+#[cfg(debug_assertions)]
+#[instrument]
+pub fn marshal<T>(data: &T) -> RMIResult<Vec<u8>>
+where
+    T: Serialize + Debug,
+{
+    serde_cbor::to_vec(&data).map_err(|e| {
+        eprintln!("Marshaling error: {e}");
+        RMIError::SerializationError(e.to_string())
+    })
+}
+
+#[cfg(not(debug_assertions))]
 pub fn marshal<T: Serialize>(data: &T) -> RMIResult<Vec<u8>> {
     serde_cbor::to_vec(&data).map_err(|e| {
         eprintln!("Marshaling error: {e}");
         RMIError::SerializationError(e.to_string())
     })
 }
+
+#[cfg_attr(debug_assertions, instrument)]
 pub fn unmarshal<T: for<'de> Deserialize<'de>>(bytes: &Vec<u8>) -> RMIResult<T> {
     serde_cbor::from_slice(&bytes).map_err(|e| {
         eprintln!("Unmarshaling error: {e} on bytes: {bytes:?}");

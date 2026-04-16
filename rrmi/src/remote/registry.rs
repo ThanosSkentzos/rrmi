@@ -281,6 +281,7 @@ impl RemoteObject for Registry {
 impl Registry {
     #[cfg_attr(debug_assertions, instrument)]
     fn handle_connection(&self, stream: &mut TcpStream) -> RMIResult<()> {
+        stream.set_nodelay(true).expect("Could not set NO_DELAY");
         let request_bytes = receive_data(stream);
         let request: RegistryRequest = unmarshal(&request_bytes)?;
         let response: RegistryResponse = self.handle_request(request);

@@ -35,7 +35,7 @@ impl Skeleton {
                     stream
                         .set_nodelay(true)
                         .map_err(|e| RMIError::TransportError(e.to_string()))
-                        .expect("Could not set no_delay");
+                        .expect("Could not set NO_DELAY");
                     let mut buf = [0u8; 4];
                     loop {
                         match stream.peek(&mut buf) {

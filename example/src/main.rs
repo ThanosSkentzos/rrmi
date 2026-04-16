@@ -1,5 +1,6 @@
 use std::sync::atomic::Ordering::SeqCst;
-use std::sync::Barrier;
+use std::sync::{Barrier, Condvar};
+use std::thread::current;
 use std::time::Instant;
 use std::{
     sync::atomic::{AtomicBool, AtomicU32, AtomicU8},
@@ -27,10 +28,13 @@ use tracing_subscriber::{prelude::*, registry::Registry};
 struct NumberServer {
     num: AtomicU32,
     num2: Mutex<u32>,
-    inbar: AtomicU8,
+    count: AtomicU8,
     total: u8,
     barrier_on: AtomicBool,
     bar: Barrier,
+    count_mut: Mutex<u8>,
+    barrier_num: Mutex<usize>,
+    condvar: Condvar,
 }
 
 #[remote_object]
@@ -39,16 +43,22 @@ impl NumberServer {
     fn new(total: u8) -> Self {
         let num = 0.into();
         let num2 = Mutex::new(0);
-        let bar = Barrier::new(total as usize);
-        let inbar = 0.into();
+        let count = 0.into();
         let barrier_on = AtomicBool::new(false);
+        let bar = Barrier::new(total as usize);
+        let count_mut = Mutex::new(0);
+        let barrier_num = Mutex::new(0);
+        let condvar = Condvar::new();
         Self {
             num,
             num2,
-            inbar,
+            count,
             total,
             barrier_on,
             bar,
+            count_mut,
+            barrier_num,
+            condvar,
         }
     }
     #[remote]
@@ -67,57 +77,89 @@ impl NumberServer {
     }
     #[remote]
     #[cfg_attr(debug_assertions, instrument)]
-    fn barrier(&self) -> () {
-        // let tid = thread::current().id();
-        // eprintln!("{tid:?} joins the barrier ");
+    fn barrier_atomic(&self) -> () {
         self.barrier_on.store(true, SeqCst);
-        self.inbar.fetch_add(1, SeqCst);
-        let mut inside = self.inbar.load(SeqCst);
+        self.count.fetch_add(1, SeqCst);
+        let mut inside = self.count.load(SeqCst);
         if inside == self.total {
             self.barrier_on.store(false, SeqCst);
-            self.inbar.store(0, SeqCst);
+            self.count.store(0, SeqCst);
         }
         while inside < self.total {
-            inside = self.inbar.load(SeqCst);
+            inside = self.count.load(SeqCst);
             let status = self.barrier_on.load(SeqCst);
             if status == false {
                 break;
             }
-            thread::sleep(Duration::from_nanos(1));
+            thread::sleep(Duration::from_micros(10));
         }
-        // self.bar.wait();
-        // eprintln!("{tid:?} escaped!")
+    }
+    #[remote]
+    #[cfg_attr(debug_assertions, instrument)]
+    fn barrier_bar(&self) -> () {
+        self.bar.wait();
+    }
+
+    #[remote]
+    #[cfg_attr(debug_assertions, instrument)]
+    fn barrier_mutex(&self) -> () {
+        let barrier_num = self.barrier_num.lock().unwrap();
+        let current_num = *barrier_num;
+        let mut count = self.count_mut.lock().unwrap();
+        *count += 1;
+        let current_count = *count;
+        drop(count);
+        drop(barrier_num);
+        if current_count < self.total {
+            let _res = self
+                .condvar
+                .wait_while(self.barrier_num.lock().unwrap(), |num| current_num == *num);
+        } else {
+            *self.count_mut.lock().unwrap() = 0;
+            *self.barrier_num.lock().unwrap() += 1;
+            self.condvar.notify_all();
+        }
     }
 }
 
 #[cfg_attr(debug_assertions, instrument)]
 fn run_thread(stub: &NumberServerStub, char: &str) {
-    let times = 33333;
-    let barrier_count = 10000;
-    let _ = stub.barrier();
+    let times = 33;
+    let barrier_count = 10;
+    let _ = stub.barrier_mutex();
     for i in 0..times {
         _ = stub.get_num_atomic().expect("should be able to get number");
         if i % barrier_count == 0 {
             _ = stub.get_num_mutex().expect("same");
             eprint!("{char}");
-            _ = stub.barrier();
-            if char == "A" {
+            _ = stub.barrier_mutex();
+            if char == "0" {
                 eprintln!("|");
             }
         }
     }
 }
+
 #[cfg_attr(debug_assertions, instrument)]
-fn run_thread_a(stub: &NumberServerStub) {
-    run_thread(stub, "A");
-}
-#[cfg_attr(debug_assertions, instrument)]
-fn run_thread_b(stub: &NumberServerStub) {
-    run_thread(stub, "B");
-}
-#[cfg_attr(debug_assertions, instrument)]
-fn run_thread_c(stub: &NumberServerStub) {
-    run_thread(stub, "C");
+fn run_threads(n: u8, port: u16) {
+    let mut handles = vec![];
+    for i in 0..n {
+        let handle = thread::Builder::new()
+            .name(format!("Stub{i}"))
+            .spawn(move || {
+                let reg = get_registry("localhost", port);
+                let stub = reg
+                    .lookup("NumberServer")
+                    .expect("stub lookup failed")
+                    .into();
+                run_thread(&stub, i.to_string().as_ref());
+            })
+            .expect("Could not spawn thread.");
+        handles.push(handle);
+    }
+    for handle in handles {
+        handle.join().expect("Could not join handle");
+    }
 }
 
 fn main() {
@@ -132,56 +174,18 @@ fn main() {
     eprintln!("Getting RegistryStub");
     let reg = get_registry("localhost", port);
 
-    let numserver = NumberServer::new(3);
+    let numthreads = 8;
+    let numserver = NumberServer::new(numthreads);
     eprintln!("Binding NumberServer");
     registry.bind("NumberServer", numserver);
 
     let t = Instant::now();
+    run_threads(numthreads, port);
 
-    eprintln!("Making thread A");
-    let ahandle = thread::Builder::new()
-        .name("Thread A".to_string())
-        .spawn(move || {
-            let reg = get_registry("localhost", port);
-            let stub = reg
-                .lookup("NumberServer")
-                .expect("stub lookup failed")
-                .into();
-            run_thread_a(&stub);
-        })
-        .expect("Could not spawn thread A");
-    eprintln!("Making thread B");
-    let bhandle = thread::Builder::new()
-        .name("Thread B".to_string())
-        .spawn(move || {
-            let reg = get_registry("localhost", port);
-            let stub = reg
-                .lookup("NumberServer")
-                .expect("stub lookup failed")
-                .into();
-            run_thread_b(&stub);
-        })
-        .expect("Could not spawn thread A");
-    eprintln!("Making thread C");
-    let chandle = thread::Builder::new()
-        .name("Thread C".to_string())
-        .spawn(move || {
-            let reg = get_registry("localhost", port);
-            let stub = reg
-                .lookup("NumberServer")
-                .expect("stub lookup failed")
-                .into();
-            run_thread_c(&stub);
-        })
-        .expect("Could not spawn thread C");
     let stub: NumberServerStub = reg
         .lookup("NumberServer")
         .expect("stub lookup failed")
         .into();
-    ahandle.join().expect("thread did not join");
-    bhandle.join().expect("thread did not join");
-    chandle.join().expect("thread did not join");
-
     let atomic = stub.get_num_atomic().expect("stub get_num failed");
     let mutex = stub.get_num_mutex().expect("stub get_num failed");
     let time = t.elapsed();

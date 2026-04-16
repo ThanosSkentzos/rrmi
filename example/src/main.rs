@@ -1,6 +1,5 @@
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::{Barrier, Condvar};
-use std::thread::current;
 use std::time::Instant;
 use std::{
     sync::atomic::{AtomicBool, AtomicU32, AtomicU8},

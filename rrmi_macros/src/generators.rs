@@ -10,6 +10,8 @@ pub fn gen_remote_obj(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
     let struct_name = &remote_obj.struct_name.0;
     quote! {
         impl RemoteObject for #struct_name{
+
+            #[cfg_attr(debug_assertions, tracing::instrument)]
             fn run(&self, stream: &mut ::rrmi::TcpStream) -> ::rrmi::RMIResult<()> {
                 self.handle_connection_gen(stream)
         }

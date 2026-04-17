@@ -2,6 +2,9 @@ use std::fmt::Debug;
 use std::io::ErrorKind;
 use std::sync::Arc;
 
+#[cfg(debug_assertions)]
+use tracing::{Level, span};
+
 use crate::RMIError;
 use crate::remote::{RMIResult, RemoteObject};
 use crate::transport::utils::get_tcp_socket_os;
@@ -14,6 +17,7 @@ impl Skeleton {
     pub fn new(object: Arc<dyn RemoteObject>) -> Self {
         Skeleton { object }
     }
+
     pub fn listen(&self) -> RMIResult<u16> {
         let listener = get_tcp_socket_os()?;
         let obj_clone = Arc::clone(&self.object);
@@ -25,6 +29,8 @@ impl Skeleton {
         let name = format!("Skeleton{object_name}");
         let _handle_skeleton = std::thread::Builder::new().name(name).spawn(move || {
             // for stream in listener.incoming() {
+            let span = span!(Level::TRACE, "listen");
+            let _enter = span.enter();
             let stream = listener.accept();
             match stream {
                 Ok((mut stream, _)) => {
@@ -38,6 +44,8 @@ impl Skeleton {
                         .expect("Could not set NO_DELAY");
                     let mut buf = [0u8; 4];
                     loop {
+                        let span = span!(Level::TRACE, "peek");
+                        let _enter = span.enter();
                         match stream.peek(&mut buf) {
                             Ok(0) => {
                                 eprintln!("{:?}: Connection closed.", obj_clone.name());
@@ -51,6 +59,7 @@ impl Skeleton {
                                 _k => eprintln!("Connection error {e:?}"),
                             },
                         };
+                        drop(_enter);
                         match obj_clone.run(&mut stream) {
                             Ok(_) => {}
                             Err(e) => {

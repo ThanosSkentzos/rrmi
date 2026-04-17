@@ -90,16 +90,16 @@ impl Registry {
     }
 
     #[cfg_attr(debug_assertions, instrument)]
-    pub fn get(&self, id: &RMI_ID) -> RMIResult<Arc<Skeleton>> {
+    pub fn get(&self, id: RMI_ID) -> RMIResult<Arc<Skeleton>> {
         //! RMI_ID -> Skeleton | for server
         let objects = self
             .objects
             .lock()
             .expect("Registry: unable to get objects lock");
         objects
-            .get(id)
+            .get(&id)
             .cloned()
-            .ok_or(RMIError::ObjectNotFound(*id))
+            .ok_or(RMIError::ObjectNotFound(id))
     }
 
     // #[remote]
@@ -113,7 +113,7 @@ impl Registry {
         let id = names
             .get(name)
             .ok_or(RMIError::NameNotFound(name.to_string()))?;
-        let skeleton = self.get(id)?;
+        let skeleton = self.get(*id)?;
         let port = skeleton.listen()?;
         let addr = self
             .construct_addr(port)
@@ -137,9 +137,11 @@ impl Registry {
         }
     }
 
-    pub fn bind(&self, name: &str, object: impl RemoteObject + 'static) -> RMI_ID {
+    pub fn bind<Obj: RemoteObject + 'static>(&self, name: &str, object: Obj) -> (Arc<Obj>, RMI_ID) {
         // bind a skelton to the registry
-        let skeleton = Arc::new(Skeleton::new(Arc::new(object)));
+        let object_ref = Arc::new(object);
+        let arc_object = Arc::clone(&object_ref);
+        let skeleton = Arc::new(Skeleton::new(object_ref));
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
         self.objects
             .lock()
@@ -150,7 +152,7 @@ impl Registry {
             .expect("Registry: unable to get names lock")
             .insert(name.to_string(), id);
         eprintln!("Registered {id}: {name}");
-        id
+        (arc_object, id)
     }
 
     pub fn unbind(&self) {

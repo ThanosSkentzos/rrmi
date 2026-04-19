@@ -207,11 +207,16 @@ impl NumberServer {
 
 #[cfg_attr(debug_assertions, instrument)]
 fn prep_data() -> (Vec<f64>, HashMap<String, String>, usize) {
+    #[cfg(debug_assertions)]
     let span = span!(Level::TRACE, "vec");
+    #[cfg(debug_assertions)]
     let _enter = span.enter();
     let vector: Vec<f64> = (0..VEC_LEN).map(|_| rand::random::<f64>()).collect();
+    #[cfg(debug_assertions)]
     drop(_enter);
+    #[cfg(debug_assertions)]
     let span = span!(Level::TRACE, "hashmap");
+    #[cfg(debug_assertions)]
     let _enter = span.enter();
     let mut hashmap = HashMap::<String, String>::new();
     let mut hashmap_size: usize = 0;
@@ -221,6 +226,7 @@ fn prep_data() -> (Vec<f64>, HashMap<String, String>, usize) {
         hashmap_size += key.len() + value.len();
         hashmap.insert(key, value);
     }
+    #[cfg(debug_assertions)]
     drop(_enter);
     (vector, hashmap, hashmap_size)
 }
@@ -300,18 +306,18 @@ fn main() {
     tracing_subscriber::registry().with(chrome_layer).init();
 
     let port = 1099;
-    let (n, n_n, n_v, n_h) = (2, 10, 1, 1);
+    let (num_clients, num_nums, num_vecs, num_hash) = (4, 1000, 1, 1);
     eprintln!("Creating Registry");
     let registry = create_registry(port);
     eprintln!("Getting RegistryStub");
     let reg = get_registry("localhost", port);
 
-    let numserver = NumberServer::new(n);
+    let numserver = NumberServer::new(num_clients);
     eprintln!("Binding NumberServer");
     let (num_server, _id) = registry.bind("NumberServer", numserver);
 
     let t = Instant::now();
-    run_clients(n, port, n_n, n_v, n_h);
+    run_clients(num_clients, port, num_nums, num_vecs, num_hash);
     let time = t.elapsed();
 
     let stub: NumberServerStub = reg
@@ -334,34 +340,30 @@ fn main() {
     eprintln!("Average: {:?}", time / final_num);
 
     eprintln!("================= NUMBER =================");
-    let time_numbers = num_server.get_num_info();
-    let total_calls = n as usize * n_n;
-    let time_roundtrip = time_numbers / total_calls as u32;
-    let bytes_to_bits: f32 = 8.0;
-    let throughput = bytes_to_bits * size_of_val(&final_num) as f32 / time_roundtrip.as_secs_f32();
-    eprintln!("Total time|calls server: {time_numbers:?}|{total_calls}");
-    eprintln!("Average roundtrip: {time_roundtrip:?}");
-    eprintln!("Average lat: {:?}", time_roundtrip / 2);
-    eprintln!("Average throughput: {:?} bps", throughput);
+    let nums_time = num_server.get_num_info();
+    let num_size = size_of_val(&final_num);
+    let num_count = num_clients as usize * num_nums;
+    print_statistics(nums_time, num_count, num_size);
 
     eprintln!("================= VECTOR =================");
-    let time_vecs = num_server.get_arr_info();
-    let total_vec_calls = n as usize * n_v;
-    let time_roundtrip_vec = time_vecs / total_vec_calls as u32;
-    let throughput_vec =
-        bytes_to_bits * size_of::<f64>() as f32 * VEC_LEN as f32 / time_roundtrip_vec.as_secs_f32();
-    eprintln!("Total time|calls server: {time_vecs:?}|{total_vec_calls}");
-    eprintln!("Average roundtrip: {time_roundtrip_vec:?}");
-    eprintln!("Average lat: {:?}", time_roundtrip_vec / 2);
-    eprintln!("Average throughput: {:?} bps", throughput_vec);
+    let vecs_time = num_server.get_arr_info();
+    let vec_size = size_of::<f64>() * VEC_LEN;
+    let vec_count = num_clients as usize * num_vecs;
+    print_statistics(vecs_time, vec_count, vec_size);
 
     eprintln!("================= HASHMAP =================");
-    let (time_hashmap, hashmap_total_size) = num_server.get_hashmap_info();
-    let total_hashmap_calls = n as usize * n_h;
-    let time_roundtrip_hashmap = time_hashmap / total_hashmap_calls as u32;
-    let throughput_hashmap = bytes_to_bits * hashmap_total_size as f32 / time_roundtrip_hashmap.as_secs_f32();
-    eprintln!("Total time|calls server: {time_hashmap:?}|{total_hashmap_calls}");
-    eprintln!("Average roundtrip: {time_roundtrip_hashmap:?}");
-    eprintln!("Average lat: {:?}", time_roundtrip_hashmap / 2);
-    eprintln!("Average throughput: {:?} bps", throughput_hashmap);
+    let (time_hash, hashmaps_size) = num_server.get_hashmap_info();
+    let hashmap_count = num_clients as usize * num_hash;
+    let hashmaps_avg_size = hashmaps_size / hashmap_count;
+    print_statistics(time_hash, hashmap_count, hashmaps_avg_size);
+}
+
+fn print_statistics(total_time: Duration, total_count: usize, avegare_size: usize) {
+    let bytes_to_bits: f32 = 8.0;
+    let average_rtt = total_time / total_count as u32;
+    let throughput = bytes_to_bits * avegare_size as f32 / average_rtt.as_secs_f32();
+    eprintln!("Total time|calls server: {total_time:?}|{total_count}");
+    eprintln!("Average roundtrip: {average_rtt:?}");
+    eprintln!("Average lat: {:?}", average_rtt / 2);
+    eprintln!("Average throughput: {:?} bps", throughput);
 }

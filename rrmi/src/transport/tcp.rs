@@ -10,10 +10,10 @@ use crate::remote::RMIResult;
 use crate::stub::{marshal, unmarshal};
 use crate::transport::Transport;
 
-#[cfg(debug_assertions)]
+#[cfg(feature = "tracing")]
 use tracing::instrument;
 
-#[cfg_attr(debug_assertions, instrument)]
+#[cfg_attr(feature = "tracing", instrument)]
 pub fn send_data(data_serial: Vec<u8>, stream: &mut TcpStream) -> RMIResult<()> {
     let len = data_serial.len() as u32;
     let _ = stream.write_all(&len.to_be_bytes()).map_err(|e| {
@@ -31,7 +31,7 @@ pub fn send_data(data_serial: Vec<u8>, stream: &mut TcpStream) -> RMIResult<()> 
     // eprintln!("tcp data sent");
     Ok(())
 }
-#[cfg_attr(debug_assertions, instrument)]
+#[cfg_attr(feature = "tracing", instrument)]
 pub fn receive_data(stream: &mut TcpStream) -> Vec<u8> {
     let mut len_bytes = [0u8; 4];
     let _ = stream.read_exact(&mut len_bytes);
@@ -66,7 +66,7 @@ impl TcpClient {
         }
     }
 }
-#[cfg(debug_assertions)]
+#[cfg(feature = "tracing")]
 impl Transport for TcpClient {
     fn send<
         REQ: Serialize + for<'de> Deserialize<'de> + Debug,
@@ -91,7 +91,7 @@ impl Transport for TcpClient {
     }
 }
 
-#[cfg(not(debug_assertions))]
+#[cfg(not(feature = "tracing"))]
 impl Transport for TcpClient {
     fn send<
         REQ: Serialize + for<'de> Deserialize<'de>,

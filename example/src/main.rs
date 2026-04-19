@@ -17,16 +17,16 @@ static HASHMAP_LEN: usize = 100_000;
 static VEC_LEN: usize = 1_000_000;
 //=============================TRACING============================
 
-#[cfg(debug_assertions)]
+#[cfg(feature = "tracing")]
 use tracing::{instrument, span, Level};
-#[cfg(debug_assertions)]
+#[cfg(feature = "tracing")]
 use tracing_chrome::ChromeLayerBuilder;
-#[cfg(debug_assertions)]
+#[cfg(feature = "tracing")]
 #[allow(unused)]
 use tracing_subscriber::{prelude::*, registry::Registry};
 
 #[allow(unused)]
-#[cfg_attr(debug_assertions, derive(Debug))]
+#[cfg_attr(feature = "tracing", derive(Debug))]
 struct NumberServer {
     num_atomic: AtomicU32,
     num_mutex: Mutex<u32>,
@@ -46,7 +46,7 @@ struct NumberServer {
 
 #[remote_object]
 impl NumberServer {
-    #[cfg_attr(debug_assertions, instrument)]
+    #[cfg_attr(feature = "tracing", instrument)]
     fn new(total_clients: u8) -> Self {
         let num_atomic = 0.into();
         let num_mutex = Mutex::new(0);
@@ -79,14 +79,14 @@ impl NumberServer {
         }
     }
     #[remote]
-    #[cfg_attr(debug_assertions, instrument)]
+    #[cfg_attr(feature = "tracing", instrument)]
     fn inc_num(&self) -> u32 {
         self.num_atomic.fetch_add(1, SeqCst);
         self.num_atomic.load(SeqCst)
     }
 
     #[remote]
-    #[cfg_attr(debug_assertions, instrument)]
+    #[cfg_attr(feature = "tracing", instrument)]
     fn send_large_vec(&self, data: Vec<f64>) -> () {
         eprintln!(
             "Received large vector of size: {}x{}B",
@@ -96,13 +96,13 @@ impl NumberServer {
     }
 
     #[remote]
-    #[cfg_attr(debug_assertions, instrument)]
+    #[cfg_attr(feature = "tracing", instrument)]
     fn send_hashmap(&self, data: HashMap<String, String>) -> () {
         eprintln!("Received hashmap with {} elements", data.len())
     }
 
     #[remote]
-    #[cfg_attr(debug_assertions, instrument)]
+    #[cfg_attr(feature = "tracing", instrument)]
     fn get_barrier_count(&self) -> u32 {
         let mut num2 = self.num_mutex.lock().unwrap();
         *num2 += 1;
@@ -110,7 +110,7 @@ impl NumberServer {
     }
 
     #[remote]
-    #[cfg_attr(debug_assertions, instrument)]
+    #[cfg_attr(feature = "tracing", instrument)]
     fn barrier_atomic(&self) -> () {
         self.barrier_on.store(true, SeqCst);
         self.count.fetch_add(1, SeqCst);
@@ -130,13 +130,13 @@ impl NumberServer {
     }
 
     #[remote]
-    #[cfg_attr(debug_assertions, instrument)]
+    #[cfg_attr(feature = "tracing", instrument)]
     fn barrier_bar(&self) -> () {
         self.bar.wait();
     }
 
     #[remote]
-    #[cfg_attr(debug_assertions, instrument)]
+    #[cfg_attr(feature = "tracing", instrument)]
     fn barrier_mutex(&self) -> () {
         let barrier_num = self.barrier_num.lock().unwrap();
         let current_num = *barrier_num;
@@ -157,7 +157,7 @@ impl NumberServer {
     }
 
     #[remote]
-    #[cfg_attr(debug_assertions, instrument)]
+    #[cfg_attr(feature = "tracing", instrument)]
     fn set_done_num(&self, time: Duration) -> () {
         let mut time_num = self.time_num.lock().expect("Could not get lock");
         *time_num += time;
@@ -165,7 +165,7 @@ impl NumberServer {
     }
 
     #[remote]
-    #[cfg_attr(debug_assertions, instrument)]
+    #[cfg_attr(feature = "tracing", instrument)]
     fn set_done_arr(&self, time: Duration) -> () {
         let mut time_arr = self.time_arr.lock().expect("Could not get lock");
         *time_arr += time;
@@ -173,7 +173,7 @@ impl NumberServer {
     }
 
     #[remote]
-    #[cfg_attr(debug_assertions, instrument)]
+    #[cfg_attr(feature = "tracing", instrument)]
     fn set_done_hash(&self, time: Duration, size: usize) -> () {
         let mut time_hash = self.time_hash.lock().expect("Could not get lock");
         *time_hash += time;
@@ -205,18 +205,18 @@ impl NumberServer {
     }
 }
 
-#[cfg_attr(debug_assertions, instrument)]
+#[cfg_attr(feature = "tracing", instrument)]
 fn prep_data() -> (Vec<f64>, HashMap<String, String>, usize) {
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "tracing")]
     let span = span!(Level::TRACE, "vec");
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "tracing")]
     let _enter = span.enter();
     let vector: Vec<f64> = (0..VEC_LEN).map(|_| rand::random::<f64>()).collect();
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "tracing")]
     drop(_enter);
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "tracing")]
     let span = span!(Level::TRACE, "hashmap");
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "tracing")]
     let _enter = span.enter();
     let mut hashmap = HashMap::<String, String>::new();
     let mut hashmap_size: usize = 0;
@@ -226,11 +226,11 @@ fn prep_data() -> (Vec<f64>, HashMap<String, String>, usize) {
         hashmap_size += key.len() + value.len();
         hashmap.insert(key, value);
     }
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "tracing")]
     drop(_enter);
     (vector, hashmap, hashmap_size)
 }
-#[cfg_attr(debug_assertions, instrument)]
+#[cfg_attr(feature = "tracing", instrument)]
 fn send_nums(stub: &NumberServerStub, times: usize) {
     let start = Instant::now();
     for _ in 0..times {
@@ -240,7 +240,7 @@ fn send_nums(stub: &NumberServerStub, times: usize) {
     stub.set_done_num(time).unwrap();
 }
 
-#[cfg_attr(debug_assertions, instrument)]
+#[cfg_attr(feature = "tracing", instrument)]
 fn send_vecs(stub: &NumberServerStub, times: usize, vector: &Vec<f64>) {
     let start = Instant::now();
     for _ in 0..times {
@@ -250,7 +250,7 @@ fn send_vecs(stub: &NumberServerStub, times: usize, vector: &Vec<f64>) {
     _ = stub.set_done_arr(time);
 }
 
-#[cfg_attr(debug_assertions, instrument)]
+#[cfg_attr(feature = "tracing", instrument)]
 fn send_hashmaps(
     stub: &NumberServerStub,
     times: usize,
@@ -264,7 +264,7 @@ fn send_hashmaps(
     let time = start.elapsed();
     _ = stub.set_done_hash(time, hashmap_size);
 }
-#[cfg_attr(debug_assertions, instrument)]
+#[cfg_attr(feature = "tracing", instrument)]
 fn client(stub: &NumberServerStub, nums: usize, vecs: usize, hashmaps: usize) {
     let (vector, hashmap, hashmap_size) = prep_data();
     let _ = stub.barrier_mutex();
@@ -277,7 +277,7 @@ fn client(stub: &NumberServerStub, nums: usize, vecs: usize, hashmaps: usize) {
     send_hashmaps(stub, hashmaps, &hashmap, hashmap_size);
 }
 
-#[cfg_attr(debug_assertions, instrument)]
+#[cfg_attr(feature = "tracing", instrument)]
 fn run_clients(n: u8, port: u16, nums: usize, vecs: usize, hashmaps: usize) {
     let mut handles = vec![];
     for i in 0..n {
@@ -300,9 +300,9 @@ fn run_clients(n: u8, port: u16, nums: usize, vecs: usize, hashmaps: usize) {
 }
 
 fn main() {
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "tracing")]
     let (chrome_layer, _guard) = ChromeLayerBuilder::new().build();
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "tracing")]
     tracing_subscriber::registry().with(chrome_layer).init();
 
     let port = 1099;

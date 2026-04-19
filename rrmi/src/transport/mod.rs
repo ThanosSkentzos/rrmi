@@ -26,7 +26,7 @@ impl Default for RMIRequest {
     }
 }
 
-#[cfg(debug_assertions)]
+#[cfg(feature = "tracing")]
 pub trait Transport {
     fn send<
         REQ: Serialize + for<'de> Deserialize<'de> + Debug,
@@ -37,7 +37,7 @@ pub trait Transport {
     ) -> RMIResult<RES>;
 }
 
-#[cfg(not(debug_assertions))]
+#[cfg(not(feature = "tracing"))]
 pub trait Transport {
     fn send<
         REQ: Serialize + for<'de> Deserialize<'de>,

@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use std::io::ErrorKind;
 use std::sync::Arc;
 
-#[cfg(debug_assertions)]
+#[cfg(feature = "tracing")]
 use tracing::{Level, span};
 
 use crate::RMIError;
@@ -29,9 +29,9 @@ impl Skeleton {
         let name = format!("Skeleton{object_name}");
         let _handle_skeleton = std::thread::Builder::new().name(name).spawn(move || {
             // for stream in listener.incoming() {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "tracing")]
             let span = span!(Level::TRACE, "listen");
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "tracing")]
             let _enter = span.enter();
             let stream = listener.accept();
             match stream {
@@ -46,9 +46,9 @@ impl Skeleton {
                         .expect("Could not set NO_DELAY");
                     let mut buf = [0u8; 4];
                     loop {
-                        #[cfg(debug_assertions)]
+                        #[cfg(feature = "tracing")]
                         let span = span!(Level::TRACE, "peek");
-                        #[cfg(debug_assertions)]
+                        #[cfg(feature = "tracing")]
                         let _enter = span.enter();
                         match stream.peek(&mut buf) {
                             Ok(0) => {
@@ -63,7 +63,7 @@ impl Skeleton {
                                 _k => eprintln!("Connection error {e:?}"),
                             },
                         };
-                        #[cfg(debug_assertions)]
+                        #[cfg(feature = "tracing")]
                         drop(_enter);
                         match obj_clone.run(&mut stream) {
                             Ok(_) => {}

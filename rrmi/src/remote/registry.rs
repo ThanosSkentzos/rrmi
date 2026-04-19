@@ -12,7 +12,7 @@ use std::net::IpAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-#[cfg(debug_assertions)]
+#[cfg(feature = "tracing")]
 use tracing::instrument;
 
 #[derive(Debug)]
@@ -39,7 +39,7 @@ impl Registry {
         Registry::new(1099)
     }
 
-    #[cfg_attr(debug_assertions, instrument)]
+    #[cfg_attr(feature = "tracing", instrument)]
     pub fn get_ip(&self) -> Result<IpAddr, ()> {
         let ips = get_local_ips().map_err(|e| eprintln!("Error getting local ip: {e:?}"));
         match ips {
@@ -51,7 +51,7 @@ impl Registry {
         }
     }
 
-    #[cfg_attr(debug_assertions, instrument)]
+    #[cfg_attr(feature = "tracing", instrument)]
     pub fn construct_addr(&self, port: u16) -> Result<SocketAddr, ()> {
         // this will be slower than just saving it
         let ips = get_local_ips().map_err(|e| eprintln!("Error getting local ip: {e:?}"));
@@ -65,7 +65,7 @@ impl Registry {
         }
     }
 
-    #[cfg_attr(debug_assertions, instrument)]
+    #[cfg_attr(feature = "tracing", instrument)]
     pub fn remove(&self, name: &str) -> RMIResult<()> {
         let mut names = self
             .names
@@ -89,7 +89,7 @@ impl Registry {
         Ok(())
     }
 
-    #[cfg_attr(debug_assertions, instrument)]
+    #[cfg_attr(feature = "tracing", instrument)]
     pub fn get(&self, id: RMI_ID) -> RMIResult<Arc<Skeleton>> {
         //! RMI_ID -> Skeleton | for server
         let objects = self
@@ -103,7 +103,7 @@ impl Registry {
     }
 
     // #[remote]
-    #[cfg_attr(debug_assertions, instrument)]
+    #[cfg_attr(feature = "tracing", instrument)]
     pub fn lookup(&self, name: &str) -> RMIResult<RemoteRef> {
         //! name -> remote ref | for client
         let names = self
@@ -122,7 +122,7 @@ impl Registry {
     }
 
     // #[remote]
-    #[cfg_attr(debug_assertions, instrument)]
+    #[cfg_attr(feature = "tracing", instrument)]
     pub fn list(&self) -> RMIResult<Vec<String>> {
         let names: Vec<String> = self
             .names
@@ -178,7 +178,7 @@ impl Registry {
 /// assert_eq!(port,reg.port);
 ///
 /// ```
-#[cfg_attr(debug_assertions, instrument)]
+#[cfg_attr(feature = "tracing", instrument)]
 pub fn create_registry(port: u16) -> Arc<Registry> {
     let reg = Arc::new(Registry::new(port));
     let port = reg.listen().expect("Registry: unable to start listening");
@@ -210,7 +210,7 @@ pub fn create_registry(port: u16) -> Arc<Registry> {
 ///
 /// ```
 //TODO: should i check connection and throw error?
-#[cfg_attr(debug_assertions, instrument)]
+#[cfg_attr(feature = "tracing", instrument)]
 pub fn get_registry(host: &str, port: u16) -> RegistryStub {
     let addr = get_addr(&host, port);
     let remote = RemoteRef::new(addr, 0);
@@ -221,7 +221,7 @@ use ::rrmi::RMIResult;
 use ::rrmi::transport::TcpListener;
 
 impl Registry {
-    #[cfg_attr(debug_assertions, instrument)]
+    #[cfg_attr(feature = "tracing", instrument)]
     pub fn listen(self: &Arc<Self>) -> RMIResult<u16> {
         // takes an arc reference to self Arc<Registry>
         // clone and move to a listening thread
@@ -281,7 +281,7 @@ impl RemoteObject for Registry {
 }
 #[allow(dead_code)]
 impl Registry {
-    #[cfg_attr(debug_assertions, instrument)]
+    #[cfg_attr(feature = "tracing", instrument)]
     fn handle_connection(&self, stream: &mut TcpStream) -> RMIResult<()> {
         stream.set_nodelay(true).expect("Could not set NO_DELAY");
         let request_bytes = receive_data(stream);
@@ -290,7 +290,7 @@ impl Registry {
         let response_bytes = marshal(&response)?;
         send_data(response_bytes, stream)
     }
-    #[cfg_attr(debug_assertions, instrument)]
+    #[cfg_attr(feature = "tracing", instrument)]
     fn handle_request(&self, req: RegistryRequest) -> RegistryResponse {
         match req {
             RegistryRequest::Lookup { name } => RegistryResponse::Lookup(self.lookup(&name)),
@@ -308,7 +308,7 @@ impl RegistryStub {
         RegistryStub { remote }
     }
 
-    #[cfg_attr(debug_assertions, instrument)]
+    #[cfg_attr(feature = "tracing", instrument)]
     pub fn lookup(&self, name: &str) -> RMIResult<Stub> {
         let transport = TcpClient::new(self.remote.addr);
         let req = RegistryRequest::Lookup {
@@ -320,7 +320,7 @@ impl RegistryStub {
             _ => Err(RMIError::TransportError("Wrong response".to_string())),
         }
     }
-    #[cfg_attr(debug_assertions, instrument)]
+    #[cfg_attr(feature = "tracing", instrument)]
     pub fn list(&self) -> RMIResult<Vec<String>> {
         let transport = TcpClient::new(self.remote.addr);
         let req = RegistryRequest::List {};

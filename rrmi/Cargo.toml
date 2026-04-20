@@ -6,11 +6,11 @@ edition = "2024"
 [dependencies]
 dns-lookup = "3.0.1"
 if-addrs = "0.15.0"
-serde = {version= "1.0.228", features=["derive"]}
+serde = { version = "1.0.228", features = ["derive"] }
 serde_cbor = "0.11.2"
 thiserror = "2.0.18"
 threadpool = "1.8.1"
-rrmi_macros = {path = "../rrmi_macros"}
+rrmi_macros = { path = "../rrmi_macros", features = ["tracing"] }
 tracing = { version = "0.1.44", optional = true }
 tracing-chrome = { version = "0.7.2", optional = true }
 tracing-subscriber = { version = "0.3.23", optional = true }
@@ -21,9 +21,13 @@ criterion = "0.8.2"
 [[bench]]
 name = "socket_benchmark"
 harness = false
-required-features =["bench"]
+required-features = ["bench"]
 
 [features]
 bench = []
-tracing = ["dep:tracing", "dep:tracing-chrome", "dep:tracing-subscriber"]
-
+tracing = [
+    "dep:tracing",
+    "dep:tracing-chrome",
+    "dep:tracing-subscriber",
+    "rrmi_macros/tracing",
+]

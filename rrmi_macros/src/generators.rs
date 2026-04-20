@@ -187,16 +187,21 @@ pub fn gen_enums(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
         // }
         quote! { #enum_variant(#ret)}
     });
+    let derive_debug = if cfg!(feature = "tracing") {
+        quote! {#[derive(::std::fmt::Debug)]}
+    } else {
+        quote! {}
+    };
 
     let enums = quote! {
         #[derive(serde::Serialize,serde::Deserialize)]
-        #[cfg_attr(feature = "tracing", derive(Debug))]
+        #derive_debug
         pub enum #req_name{
             #(#req_variants),*
         }
 
         #[derive(serde::Serialize,serde::Deserialize)]
-        #[cfg_attr(feature = "tracing", derive(Debug))]
+        #derive_debug
         pub enum #res_name{
             #(#res_variants),*
         }

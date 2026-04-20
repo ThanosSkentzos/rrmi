@@ -1,10 +1,19 @@
-use example::number_server::{local_test, remote_test};
+use example::number_server::{run_local, run_remote};
+use std::env;
 
 fn main() {
-    let local = true;
+    let local = false;
+    let args: Vec<String> = env::args().collect();
+    if args.len() < 1 {
+        eprintln!("Usage: ./example <number_calls>")
+    }
+    let arg = &args[1];
+    let num_calls = arg
+        .parse::<usize>()
+        .expect(&format!("Error parsing argument {arg} as usize"));
     if local {
-        local_test();
+        run_local(num_calls);
     } else {
-        remote_test();
+        run_remote(num_calls);
     }
 }

@@ -1,8 +1,9 @@
-use core::num;
 use std::collections::HashMap;
 use std::process::exit;
+use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::{Barrier, Condvar};
+use std::thread::sleep;
 use std::time::Instant;
 use std::vec;
 use std::{
@@ -12,7 +13,6 @@ use std::{
     time::Duration,
 };
 
-use rrmi::remote::registry;
 use rrmi::{create_registry, get_registry, remote::RemoteObject};
 use rrmi_macros::remote_object;
 use thousands::Separable;
@@ -51,7 +51,7 @@ struct NumberServer {
     time_arr: Mutex<Duration>,
     time_hash: Mutex<Duration>,
     hashmap_total_size: Mutex<usize>,
-    num_clients_done: AtomicU8,
+    num_clients_done: AtomicUsize,
 }
 
 #[remote_object]
@@ -194,6 +194,10 @@ impl NumberServer {
             .expect("Could not acquire lock");
         *hashmap_total_size += size
     }
+    #[remote]
+    fn get_clients_done(&self) -> usize {
+        self.num_clients_done.load(SeqCst)
+    }
 
     fn get_num_info(&self) -> Duration {
         let time = self.time_num.lock().expect("unable to acquire lock");
@@ -293,13 +297,13 @@ fn client(nums: usize, vecs: usize, hashmaps: usize) {
 }
 
 #[cfg_attr(feature = "tracing", instrument)]
-fn run_clients_local() {
+fn run_clients_local(num_clients: u8, num_calls: usize) {
     let mut handles = vec![];
-    for i in 0..NUM_CLIENTS {
+    for i in 0..num_clients {
         let handle = thread::Builder::new()
             .name(format!("Stub{i}"))
             .spawn(move || {
-                client(NUM_NUMS, NUM_VECS, NUM_HASH);
+                client(num_calls, NUM_VECS, NUM_HASH);
             })
             .expect("Could not spawn thread.");
         handles.push(handle);
@@ -310,11 +314,30 @@ fn run_clients_local() {
 }
 
 #[cfg_attr(feature = "tracing", instrument)]
-fn run_clients_remote() {
-    todo!("find a way to block")
+fn run_clients_remote(num_clients: u8, num_calls: usize) {
+    eprintln!("waiting for {num_clients} clients to finish {num_calls} of inc_num, {NUM_VECS} of send_large_vec and {NUM_HASH} send_hashmap");
+    let reg = get_registry("localhost", REG_PORT);
+    let stub: NumberServerStub = reg
+        .lookup("NumberServer")
+        .expect("stub lookup failed")
+        .into();
+    let mut done = false;
+    let mut prev: usize = 0;
+    let mut num_done: usize = 0;
+    while !done {
+        prev = num_done;
+        num_done = stub.get_clients_done().unwrap();
+        if prev != num_done {
+            eprintln!("Done clients increased to {num_done}")
+        }
+        if num_done == 3 * num_clients as usize {
+            done = true;
+        }
+        sleep(Duration::from_millis(10));
+    }
 }
 
-pub fn server(experiment: fn(), num_clients: u8) {
+pub fn server(experiment: fn(u8, usize), num_clients: u8, num_calls: usize) {
     #[cfg(feature = "tracing")]
     let (chrome_layer, _guard) = ChromeLayerBuilder::new().build();
     #[cfg(feature = "tracing")]
@@ -331,7 +354,8 @@ pub fn server(experiment: fn(), num_clients: u8) {
 
     // RUN EXPERIMENT
     let t = Instant::now();
-    experiment();
+    eprintln!("Running experiment with {num_clients} clients and {num_calls} numbers sent");
+    experiment(num_clients, num_calls);
     let time = t.elapsed();
 
     // FINAL NUMBER
@@ -347,9 +371,10 @@ pub fn server(experiment: fn(), num_clients: u8) {
         .expect("stub get_barrier_count failed");
 
     eprintln!(
-        "Total count atomic: {} & mutex: {}",
+        "Total count atomic: {} & mutex: {}, clients_done: {}",
         final_num.separate_with_underscores(),
-        mutex.separate_with_underscores()
+        mutex.separate_with_underscores(),
+        num_server.get_clients_done()
     );
 
     // STATISTICS
@@ -385,10 +410,10 @@ fn print_statistics(total_time: Duration, total_count: usize, avegare_size: usiz
     eprintln!("Average lat: {:?}", average_rtt / 2);
     eprintln!("Average throughput: {:?} bps", throughput);
 }
-pub fn local_test() {
-    server(run_clients_local, NUM_CLIENTS);
+pub fn run_local(num_calls: usize) {
+    server(run_clients_local, NUM_CLIENTS, num_calls);
 }
-pub fn remote_test() {
+pub fn run_remote(num_calls: usize) {
     let util = Utils::new();
     eprintln!("{util:?}");
     let nodes = util.nodes;
@@ -401,8 +426,8 @@ pub fn remote_test() {
     }
 
     if this_node == coordinator {
-        server(run_clients_remote, (nodes.len() - 1) as u8);
+        server(run_clients_remote, (nodes.len() - 1) as u8, num_calls);
     } else {
-        client(NUM_NUMS, NUM_VECS, NUM_HASH);
+        client(num_calls, NUM_VECS, NUM_HASH);
     }
 }

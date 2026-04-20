@@ -1,7 +1,8 @@
 use std::time::Duration;
 
-use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
-use rrmi::utils::{get_tcp_socket_os, get_tcp_socket_linear}; // adjust import
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
+use rrmi::utils::{get_tcp_socket_linear, get_tcp_socket_os};
+use std::hint::black_box; // adjust import
 
 fn bench_ports(c: &mut Criterion) {
     let mut group = c.benchmark_group("find_available_port");

@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+gethostname = "1.1.0"
 rand = "0.10.1"
 rrmi = { path = "../rrmi" }
 rrmi_macros = { path = "../rrmi_macros" }

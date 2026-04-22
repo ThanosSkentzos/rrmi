@@ -22,7 +22,7 @@ static REG_PORT: u16 = 1099;
 static NUM_NUMS: usize = 1000;
 static NUM_VECS: usize = 1;
 static NUM_HASH: usize = 1;
-static NUM_CLIENTS: u8 = 4;
+static NUM_CLIENTS: u8 = 2;
 //=============================TRACING============================
 
 #[cfg(feature = "tracing")]
@@ -322,7 +322,7 @@ fn run_clients_remote(num_clients: u8, num_calls: usize) {
         .expect("stub lookup failed")
         .into();
     let mut done = false;
-    let mut prev: usize = 0;
+    let mut prev: usize;
     let mut num_done: usize = 0;
     while !done {
         prev = num_done;
@@ -416,17 +416,14 @@ pub fn run_local(num_calls: usize) {
 pub fn run_remote(num_calls: usize) {
     let util = Utils::new();
     eprintln!("{util:?}");
-    let nodes = util.nodes;
-    let coordinator = util.coordinator;
-    let this_node = util.my_hostname;
 
-    if nodes.len() < 2 {
+    if util.nodes.len() < 2 {
         eprintln!("This application needs to be executed on at least 2 machines.\nexiting...");
         exit(1);
     }
 
-    if this_node == coordinator {
-        server(run_clients_remote, (nodes.len() - 1) as u8, num_calls);
+    if  util.am_i_coordinator() {
+        server(run_clients_remote, (util.nodes.len() - 1) as u8, num_calls);
     } else {
         client(num_calls, NUM_VECS, NUM_HASH);
     }

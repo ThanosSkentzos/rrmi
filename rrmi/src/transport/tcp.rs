@@ -53,7 +53,7 @@ pub struct TcpClient {
 impl TcpClient {
     pub fn new(server_addr: SocketAddr) -> Self {
         let stream = TcpStream::connect(server_addr).expect("Could not connect to server");
-        stream.set_nodelay(true).unwrap();
+        stream.set_nodelay(true).expect("Could not set NO_DELAY");
         let address = stream
             .local_addr()
             .expect("Could not get stream address")

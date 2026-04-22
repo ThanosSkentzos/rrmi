@@ -3,9 +3,10 @@ use std::io::ErrorKind;
 use std::sync::Arc;
 
 #[cfg(feature = "tracing")]
+use tracing::instrument;
+#[cfg(feature = "tracing")]
 use tracing::{Level, span};
 
-use crate::RMIError;
 use crate::remote::{RMIResult, RemoteObject};
 use crate::transport::utils::get_tcp_socket_os;
 
@@ -18,6 +19,7 @@ impl Skeleton {
         Skeleton { object }
     }
 
+    #[cfg_attr(feature = "tracing", instrument)]
     pub fn listen(&self) -> RMIResult<u16> {
         let listener = get_tcp_socket_os()?;
         let obj_clone = Arc::clone(&self.object);
@@ -40,10 +42,7 @@ impl Skeleton {
                         "{object_name} established connection with {:?}",
                         stream.peer_addr()
                     );
-                    stream
-                        .set_nodelay(true)
-                        .map_err(|e| RMIError::TransportError(e.to_string()))
-                        .expect("Could not set NO_DELAY");
+                    stream.set_nodelay(true).expect("Could not set NO_DELAY");
                     let mut buf = [0u8; 4];
                     loop {
                         #[cfg(feature = "tracing")]

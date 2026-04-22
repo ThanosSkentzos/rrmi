@@ -90,6 +90,18 @@ impl Registry {
     }
 
     #[cfg_attr(feature = "tracing", instrument)]
+    pub fn get_id(&self, name: &str) -> RMIResult<RMI_ID> {
+        let names = self
+            .names
+            .lock()
+            .expect("Registry: unable to get names lock");
+        let id = names
+            .get(name).copied()
+            .ok_or(RMIError::NameNotFound(name.to_string()));
+        id
+    }
+    
+    #[cfg_attr(feature = "tracing", instrument)]
     pub fn get(&self, id: RMI_ID) -> RMIResult<Arc<Skeleton>> {
         //! RMI_ID -> Skeleton | for server
         let objects = self
@@ -106,19 +118,13 @@ impl Registry {
     #[cfg_attr(feature = "tracing", instrument)]
     pub fn lookup(&self, name: &str) -> RMIResult<RemoteRef> {
         //! name -> remote ref | for client
-        let names = self
-            .names
-            .lock()
-            .expect("Registry: unable to get names lock");
-        let id = names
-            .get(name)
-            .ok_or(RMIError::NameNotFound(name.to_string()))?;
-        let skeleton = self.get(*id)?;
+        let id = self.get_id(name)?;
+        let skeleton = self.get(id)?;
         let port = skeleton.listen()?;
         let addr = self
             .construct_addr(port)
             .map_err(|_| RMIError::TransportError("Cannot get local ip".to_string()))?;
-        Ok(RemoteRef { addr, id: *id })
+        Ok(RemoteRef { addr, id })
     }
 
     // #[remote]

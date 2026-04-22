@@ -109,4 +109,13 @@ mod tests {
         let res = internal_get_hostnames("node[01,05,08]");
         assert_eq!(res, ["node01", "node05", "node08"])
     }
+
+    #[test]
+    fn test_comma_range() {
+        let res = internal_get_hostnames("node[001,005,008-12]");
+        assert_eq!(
+            res,
+            ["node001", "node005", "node008", "node009", "node010", "node011", "node012"]
+        )
+    }
 }

@@ -6,8 +6,8 @@ edition = "2021"
 [dependencies]
 gethostname = "1.1.0"
 rand = "0.10.1"
-rrmi = { path = "../rrmi", features = ["tracing"] }
-rrmi_macros = { path = "../rrmi_macros", features = ["tracing"] }
+rrmi = { path = "../rrmi" }
+rrmi_macros = { path = "../rrmi_macros" }
 serde = "1.0.228"
 thousands = "0.2"
 tracing = { version = "0.1.44", optional = true }

@@ -8,10 +8,16 @@ use crate::{
 
 pub fn gen_remote_obj(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
     let struct_name = &remote_obj.struct_name.0;
+    #[cfg(not(feature = "tracing"))]
+    let instrument = quote! {};
+    #[cfg(feature = "tracing")]
+    let instrument = quote! {
+        #[allow(unexpected_cfgs)]
+        #[cfg_attr(feature = "tracing", ::tracing::instrument)]
+    };
     quote! {
         impl RemoteObject for #struct_name{
-
-            #[cfg_attr(feature = "tracing", tracing::instrument)]
+            #instrument
             fn run(&self, stream: &mut ::rrmi::TcpStream) -> ::rrmi::RMIResult<()> {
                 self.handle_connection_gen(stream)
         }
@@ -94,9 +100,15 @@ pub fn gen_stub(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
             }
         }
     };
-
-    quote! {
+    #[cfg(not(feature = "tracing"))]
+    let debug = quote! {};
+    #[cfg(feature = "tracing")]
+    let debug = quote! {
+        #[allow(unexpected_cfgs)]
         #[cfg_attr(feature = "tracing", derive(Debug))]
+    };
+    quote! {
+        #debug
         #stub_struct
         impl #stub_name{
         #(#functions)*
@@ -106,8 +118,15 @@ pub fn gen_stub(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
 
 pub fn gen_handle_connection(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
     let (req_name, res_name) = remote_obj.get_enum_names();
-    quote! {
+    #[cfg(not(feature = "tracing"))]
+    let instrument = quote! {};
+    #[cfg(feature = "tracing")]
+    let instrument = quote! {
+        #[allow(unexpected_cfgs)]
         #[cfg_attr(feature = "tracing", ::tracing::instrument)]
+    };
+    quote! {
+        #instrument
         fn handle_connection_gen(&self, stream: &mut ::rrmi::TcpStream) -> ::rrmi::RMIResult<()> {
             let request_bytes = ::rrmi::receive_data(stream);
             let request: #req_name = ::rrmi::unmarshal(&request_bytes)?;
@@ -146,8 +165,15 @@ pub fn gen_handle_request(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
         };
         quote! { #pattern => #res_name::#camel(#call)}
     });
-    quote! {
+    #[cfg(not(feature = "tracing"))]
+    let instrument = quote! {};
+    #[cfg(feature = "tracing")]
+    let instrument = quote! {
+        #[allow(unexpected_cfgs)]
         #[cfg_attr(feature = "tracing", ::tracing::instrument)]
+    };
+    quote! {
+        #instrument
         fn handle_request_gen(&self, req: #req_name) -> #res_name{
             match req{
                 #(#match_arms),*

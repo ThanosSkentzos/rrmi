@@ -422,7 +422,7 @@ pub fn run_remote(num_calls: usize) {
         exit(1);
     }
 
-    if  util.am_i_coordinator() {
+    if util.am_i_coordinator() {
         server(run_clients_remote, (util.nodes.len() - 1) as u8, num_calls);
     } else {
         client(num_calls, NUM_VECS, NUM_HASH);

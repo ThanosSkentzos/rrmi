@@ -10,7 +10,7 @@ serde = { version = "1.0.228", features = ["derive"] }
 serde_cbor = "0.11.2"
 thiserror = "2.0.18"
 threadpool = "1.8.1"
-rrmi_macros = { path = "../rrmi_macros", features = ["tracing"] }
+rrmi_macros = { path = "../rrmi_macros" }
 tracing = { version = "0.1.44", optional = true }
 tracing-chrome = { version = "0.7.2", optional = true }
 tracing-subscriber = { version = "0.3.23", optional = true }

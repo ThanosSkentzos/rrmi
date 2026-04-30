@@ -1,7 +1,17 @@
 use example::number_server::{run_local, run_remote};
 use std::{env, process::exit};
 
+#[cfg(feature = "tracing")]
+use tracing_chrome::ChromeLayerBuilder;
+#[cfg(feature = "tracing")]
+#[allow(unused)]
+use tracing_subscriber::{prelude::*, registry::Registry};
+
 fn main() {
+    #[cfg(feature = "tracing")]
+    let (chrome_layer, _guard) = ChromeLayerBuilder::new().build();
+    #[cfg(feature = "tracing")]
+    tracing_subscriber::registry().with(chrome_layer).init();
     let local = false;
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {

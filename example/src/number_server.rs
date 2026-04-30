@@ -338,10 +338,6 @@ fn run_clients_remote(num_clients: u8, num_calls: usize) {
 }
 
 pub fn server(experiment: fn(u8, usize), num_clients: u8, num_calls: usize) {
-    #[cfg(feature = "tracing")]
-    let (chrome_layer, _guard) = ChromeLayerBuilder::new().build();
-    #[cfg(feature = "tracing")]
-    tracing_subscriber::registry().with(chrome_layer).init();
     // CREATE REGISTRY
     let port = REG_PORT;
     eprintln!("Creating Registry");
@@ -376,7 +372,6 @@ pub fn server(experiment: fn(u8, usize), num_clients: u8, num_calls: usize) {
         mutex.separate_with_underscores(),
         num_server.get_clients_done()
     );
-
     // STATISTICS
     eprintln!("================= SERVER =================");
     eprintln!("Total time|count: {time:?}|{final_num}");
@@ -430,6 +425,7 @@ pub fn run_remote(num_calls: usize) {
         );
     } else {
         let server_hostname = util.liacs_coordinator;
+        sleep(Duration::from_secs(1));
         client(&server_hostname, num_calls, NUM_VECS, NUM_HASH);
     }
 }

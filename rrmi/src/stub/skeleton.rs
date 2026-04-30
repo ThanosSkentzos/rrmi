@@ -28,7 +28,8 @@ impl Skeleton {
             .local_addr()
             .expect(&format!("{object_name}: does not have an address"));
         eprintln!("{object_name} uses address: {addr}");
-        let name = format!("Skeleton{object_name}");
+        let port = addr.port();
+        let name = format!("Skeleton{object_name}:{port}");
         let _handle_skeleton = std::thread::Builder::new().name(name).spawn(move || {
             // for stream in listener.incoming() {
             #[cfg(feature = "tracing")]

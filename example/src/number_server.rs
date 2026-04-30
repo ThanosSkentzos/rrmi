@@ -19,10 +19,10 @@ use thousands::Separable;
 static HASHMAP_LEN: usize = 100_000;
 static VEC_LEN: usize = 1_000_000;
 static REG_PORT: u16 = 1099;
-static NUM_NUMS: usize = 1000;
+// static NUM_NUMS: usize = 1000;
 static NUM_VECS: usize = 1;
 static NUM_HASH: usize = 1;
-static NUM_CLIENTS: u8 = 2;
+static NUM_CLIENTS_LOCAL: u8 = 2;
 //=============================TRACING============================
 
 #[cfg(feature = "tracing")]
@@ -279,8 +279,8 @@ fn send_hashmaps(
     _ = stub.set_done_hash(time, hashmap_size);
 }
 #[cfg_attr(feature = "tracing", instrument)]
-fn client(nums: usize, vecs: usize, hashmaps: usize) {
-    let reg = get_registry("localhost", REG_PORT);
+fn client(host: &str, nums: usize, vecs: usize, hashmaps: usize) {
+    let reg = get_registry(host, REG_PORT);
     let stub: NumberServerStub = reg
         .lookup("NumberServer")
         .expect("stub lookup failed")
@@ -303,7 +303,7 @@ fn run_clients_local(num_clients: u8, num_calls: usize) {
         let handle = thread::Builder::new()
             .name(format!("Stub{i}"))
             .spawn(move || {
-                client(num_calls, NUM_VECS, NUM_HASH);
+                client("localhost", num_calls, NUM_VECS, NUM_HASH);
             })
             .expect("Could not spawn thread.");
         handles.push(handle);
@@ -385,18 +385,18 @@ pub fn server(experiment: fn(u8, usize), num_clients: u8, num_calls: usize) {
     eprintln!("================= NUMBER =================");
     let nums_time = num_server.get_num_info();
     let num_size = size_of_val(&final_num);
-    let num_count = NUM_CLIENTS as usize * NUM_NUMS;
+    let num_count = num_clients as usize * num_calls;
     print_statistics(nums_time, num_count, num_size);
 
     eprintln!("================= VECTOR =================");
     let vecs_time = num_server.get_arr_info();
     let vec_size = size_of::<f64>() * VEC_LEN;
-    let vec_count = NUM_CLIENTS as usize * NUM_VECS;
+    let vec_count = num_clients as usize * NUM_VECS;
     print_statistics(vecs_time, vec_count, vec_size);
 
     eprintln!("================= HASHMAP =================");
     let (time_hash, hashmaps_size) = num_server.get_hashmap_info();
-    let hashmap_count = NUM_CLIENTS as usize * NUM_HASH;
+    let hashmap_count = num_clients as usize * NUM_HASH;
     let hashmaps_avg_size = hashmaps_size / hashmap_count;
     print_statistics(time_hash, hashmap_count, hashmaps_avg_size);
 }
@@ -411,20 +411,25 @@ fn print_statistics(total_time: Duration, total_count: usize, avegare_size: usiz
     eprintln!("Average throughput: {:?} bps", throughput);
 }
 pub fn run_local(num_calls: usize) {
-    server(run_clients_local, NUM_CLIENTS, num_calls);
+    server(run_clients_local, NUM_CLIENTS_LOCAL, num_calls);
 }
 pub fn run_remote(num_calls: usize) {
     let util = Utils::new();
     eprintln!("{util:?}");
 
-    if util.nodes.len() < 2 {
+    if util.liacs_nodes.len() < 2 {
         eprintln!("This application needs to be executed on at least 2 machines.\nexiting...");
         exit(1);
     }
 
-    if util.am_i_coordinator() {
-        server(run_clients_remote, (util.nodes.len() - 1) as u8, num_calls);
+    if util.am_i_liacs_coordinator() {
+        server(
+            run_clients_remote,
+            (util.liacs_nodes.len() - 1) as u8,
+            num_calls,
+        );
     } else {
-        client(num_calls, NUM_VECS, NUM_HASH);
+        let server_hostname = util.liacs_coordinator;
+        client(&server_hostname, num_calls, NUM_VECS, NUM_HASH);
     }
 }

@@ -1,0 +1,17 @@
+#!/bin/bash
+
+#SBATCH --job-name=rrmi         # Job name
+#SBATCH --output=job_%j.out     # Output file (%j = SLURM job ID)
+#SBATCH --error=job_%j.err      # Error file
+#SBATCH --nodes=1               # Number of nodes
+#SBATCH --ntasks-per-node=2     # Number of tasks per node
+#SBATCH --cpus-per-task=1       # Number of threads per task (modify for multithreading)
+#SBATCH --time=00:05:00         # Time limit (HH:MM:SS)
+#SBATCH --nice=100              # Job priority (allow higher priority jobs first)
+
+# Load required modules if needed later
+
+# Set environment variables if needed (e.g., OMP_NUM_THREADS when using OpenMP)
+
+# Run the binary with arguments
+./target/debug/example -l true 100

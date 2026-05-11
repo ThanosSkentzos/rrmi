@@ -408,7 +408,7 @@ fn print_statistics(total_time: Duration, total_count: usize, avegare_size: usiz
 pub fn run_local(num_calls: usize) {
     server(run_clients_local, NUM_CLIENTS_LOCAL, num_calls);
 }
-pub fn run_remote(num_calls: usize) {
+pub fn run_remote_liacs(num_calls: usize) {
     let util = Utils::new();
     eprintln!("{util:?}");
 
@@ -425,6 +425,28 @@ pub fn run_remote(num_calls: usize) {
         );
     } else {
         let server_hostname = util.liacs_coordinator;
+        sleep(Duration::from_secs(1));
+        client(&server_hostname, num_calls, NUM_VECS, NUM_HASH);
+    }
+}
+
+pub fn run_remote_das(num_calls: usize) {
+    let util = Utils::new();
+    eprintln!("{util:?}");
+
+    if util.slurm_nodes.len() < 2 {
+        eprintln!("This application needs to be executed on at least 2 machines.\nexiting...");
+        exit(1);
+    }
+
+    if util.am_i_slurm_coordinator() {
+        server(
+            run_clients_remote,
+            (util.slurm_nodes.len() - 1) as u8,
+            num_calls,
+        );
+    } else {
+        let server_hostname = util.slurm_coordinator;
         sleep(Duration::from_secs(1));
         client(&server_hostname, num_calls, NUM_VECS, NUM_HASH);
     }

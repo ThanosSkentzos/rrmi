@@ -1,4 +1,4 @@
-use example::number_server::{run_local, run_remote};
+use example::number_server::{run_local, run_remote_das, run_remote_liacs};
 
 #[cfg(feature = "tracing")]
 use tracing_chrome::ChromeLayerBuilder;
@@ -13,11 +13,21 @@ enum Local {
     False,
     True,
 }
+
+#[derive(ValueEnum, Clone, Debug)]
+enum Liacs {
+    False,
+    True,
+}
+
 #[derive(Parser, Debug)]
 struct MyArgs {
     #[arg(short, long, value_enum, default_value_t = Local::False)]
     local: Local,
     num_calls: usize,
+
+    #[arg(long, value_enum, default_value_t = Liacs::False)]
+    liacs: Liacs,
 }
 fn main() {
     #[cfg(feature = "tracing")]
@@ -35,7 +45,10 @@ fn main() {
         }
         Local::False => {
             eprintln!("RUNNING REMOTE");
-            run_remote(num_calls);
+            match args.liacs {
+                Liacs::False => run_remote_das(num_calls),
+                Liacs::True => run_remote_liacs(num_calls),
+            }
         }
     }
 }

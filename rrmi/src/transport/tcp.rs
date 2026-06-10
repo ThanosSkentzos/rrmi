@@ -1,22 +1,40 @@
 use std::cell::RefCell;
 use std::fmt::Debug;
-use std::io::{Read, Write};
+use std::io::{ErrorKind, IoSlice, Read, Write};
 pub use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
+use std::sync::Arc;
 
 use crate::stub::{Deserialize, Serialize};
 
 use crate::error::RMIError;
-use crate::remote::RMIResult;
+use crate::remote::{RMIResult, RemoteObject};
 use crate::stub::{marshal, unmarshal};
 use crate::transport::Transport;
 
 #[cfg(feature = "tracing")]
 use tracing::instrument;
+#[cfg(feature = "tracing")]
+use tracing::{Level, span};
 
 #[cfg_attr(feature = "tracing", instrument)]
 pub fn send_data(data_serial: Vec<u8>, stream: &mut TcpStream) -> RMIResult<()> {
-    let len = data_serial.len() as u32;
-    let _ = stream.write_all(&len.to_be_bytes()).map_err(|e| {
+    //TODO: find a way of sending just the data, not the size first
+    _send_data_ioslice(data_serial, stream)
+    // let len = (data_serial.len() as u32).to_be_bytes();
+
+    // let mut buf = Vec::with_capacity(4 + data_serial.len());
+    // buf.extend_from_slice(&len);
+    // buf.extend_from_slice(&data_serial);
+    // let _ = stream
+    //     .write_all(&buf)
+    //     .map_err(|e| RMIError::TransportError(e.to_string()));
+
+    // Ok(())
+}
+
+pub fn _send_data_separate(data_serial: Vec<u8>, stream: &mut TcpStream) -> RMIResult<()> {
+    let len = data_serial.len().to_be_bytes();
+    let _ = stream.write_all(&len).map_err(|e| {
         eprintln!("write len failed {e}");
         RMIError::TransportError(e.to_string())
     })?;
@@ -24,24 +42,74 @@ pub fn send_data(data_serial: Vec<u8>, stream: &mut TcpStream) -> RMIResult<()> 
         eprintln!("write data failed {e}");
         RMIError::TransportError(e.to_string())
     })?;
+    Ok(())
+}
+
+pub fn _send_data_separate_flush(data_serial: Vec<u8>, stream: &mut TcpStream) -> RMIResult<()> {
+    let len = data_serial.len().to_be_bytes();
+    let _ = stream.write_all(&len).map_err(|e| {
+        eprintln!("write len failed {e}");
+        RMIError::TransportError(e.to_string())
+    })?;
+    let _ = stream.write_all(&data_serial).map_err(|e| {
+        eprintln!("write data failed {e}");
+        RMIError::TransportError(e.to_string())
+    })?;
+    // flush should do nothing for TCP cause its not buffered
     let _ = stream.flush().map_err(|e| {
         eprintln!("flush failed {e}");
         RMIError::TransportError(e.to_string())
     })?;
-    // eprintln!("tcp data sent");
     Ok(())
 }
+pub fn _send_data_combined(data_serial: Vec<u8>, stream: &mut TcpStream) -> RMIResult<()> {
+    let len = (data_serial.len() as u32).to_be_bytes();
+    let mut buf = Vec::with_capacity(4 + data_serial.len());
+    buf.extend_from_slice(&len);
+    buf.extend_from_slice(&data_serial);
+    let _ = stream
+        .write_all(&buf)
+        .map_err(|e| RMIError::TransportError(e.to_string()))?;
+    Ok(())
+}
+pub fn _send_data_ioslice(data_serial: Vec<u8>, stream: &mut TcpStream) -> RMIResult<()> {
+    //TODO: find a way of sending just the data, not the size first
+    let len = (data_serial.len() as u32).to_be_bytes();
+
+    let bufs = &[IoSlice::new(&len), IoSlice::new(&data_serial)];
+    let _ = stream
+        .write_vectored(bufs)
+        .map_err(|e| RMIError::TransportError(e.to_string()))?;
+    Ok(())
+}
+
 #[cfg_attr(feature = "tracing", instrument)]
-pub fn receive_data(stream: &mut TcpStream) -> Vec<u8> {
-    let mut len_bytes = [0u8; 4];
-    let _ = stream.read_exact(&mut len_bytes);
-    let response_len = u32::from_be_bytes(len_bytes) as usize;
+pub fn receive_data(stream: &mut TcpStream) -> RMIResult<Vec<u8>> {
+    let mut len = [0u8; 4];
+    stream.read_exact(&mut len).map_err(|e| match e.kind() {
+        ErrorKind::UnexpectedEof => RMIError::TransportError("connection closed".into()),
+        _ => RMIError::TransportError(e.to_string()),
+    })?;
+    let response_len = u32::from_be_bytes(len) as usize;
+
+    const MAX_SIZE: usize = 16 * 1024 * 1024;
+    if response_len > MAX_SIZE {
+        return Err(RMIError::TransportError(format!(
+            "message with len {} exceeded maximum size of {}",
+            response_len, MAX_SIZE
+        )));
+    }
 
     // eprintln!("tcp reading response {response_len:?} bytes...");
+    //TODO how can I avoid reallocation here
     let mut bytes = vec![0u8; response_len];
-    let _ = stream.read_exact(&mut bytes);
-    bytes
+    stream.read_exact(&mut bytes).map_err(|e| match e.kind() {
+        ErrorKind::UnexpectedEof => RMIError::TransportError("connection closed".into()),
+        _ => RMIError::TransportError(e.to_string()),
+    })?;
+    Ok(bytes)
 }
+
 #[allow(unused)]
 #[derive(Debug)]
 pub struct TcpClient {
@@ -109,9 +177,98 @@ impl Transport for TcpClient {
             e
         })?;
         // eprintln!("receive_data");
-        let response_bytes = receive_data(&mut stream);
+        let response_bytes = receive_data(&mut stream).expect("Message exceeded maximum size");
         // eprintln!("unmarshaling");
         let response: RES = unmarshal(&response_bytes)?;
         Ok(response)
+    }
+}
+
+pub struct TcpServer {
+    listener: TcpListener,
+    obj: Arc<dyn RemoteObject>,
+}
+
+impl TcpServer {
+    pub fn new(listener: TcpListener, obj: Arc<dyn RemoteObject>) -> Self {
+        Self { listener, obj }
+    }
+}
+
+impl TcpServer {
+    pub fn listen(&self) {
+        let stream = self.listener.accept();
+
+        match stream {
+            Ok((stream, peer)) => {
+                eprintln!(
+                    "{} established connection with {:?}",
+                    self.obj.name(),
+                    stream.peer_addr()
+                );
+                stream.set_nodelay(true).expect("Could not set NO_DELAY");
+                self.receive_loop(stream, peer);
+            }
+            Err(e) => eprintln!("Transport error:{e}"),
+        };
+    }
+
+    fn receive_loop(&self, mut stream: TcpStream, peer: SocketAddr) {
+        let mut buf = [0u8; 4];
+        loop {
+            #[cfg(feature = "tracing")]
+            let span = span!(Level::TRACE, "peek");
+            #[cfg(feature = "tracing")]
+            let _enter = span.enter();
+
+            let num_bytes = stream.peek(&mut buf);
+            match num_bytes {
+                Ok(0) => {
+                    eprintln!("{:?}: Connection to {peer} closed.", self.obj.name());
+                    break;
+                }
+                // Ok(1) => {//handle reference moving to new peer
+                //     let new_peer;
+                //     (stream, new_peer) = self.listener.accept().expect("todo handle error");
+                //     if new_peer == peer {// just reconnect
+                //     epritnln!("Reconnected to {peer}");
+                //     }
+                //     let mut code = [0u8; 1];
+                //     stream
+                //         .read_exact(&mut code)
+                //         .expect("Could not read tcp buffer");
+                //     match code[0] {
+                //         42 => continue,
+                //         _ => {
+                //             eprintln!(
+                //                 "Invalid code on connection stealing.\nClosing connection..."
+                //             );
+                //             break;
+                //         }
+                //     }
+                // }
+                Ok(_) => (), //valid connection
+                Err(e) => match e.kind() {
+                    ErrorKind::ConnectionReset | ErrorKind::BrokenPipe => {
+                        eprintln!("Connection closed due to error: {e}")
+                    }
+                    _k => eprintln!("Connection error {e:?}"),
+                },
+            }
+
+            #[cfg(feature = "tracing")]
+            drop(_enter);
+
+            match self.obj.run(&mut stream) {
+                Ok(_) => {}
+                Err(e) => {
+                    eprintln!(
+                        "{:?} Connection closed when running: {e}",
+                        stream.peer_addr()
+                    );
+                    break;
+                }
+            }
+        }
     }
 }

@@ -290,7 +290,7 @@ impl Registry {
     #[cfg_attr(feature = "tracing", instrument)]
     fn handle_connection(&self, stream: &mut TcpStream) -> RMIResult<()> {
         stream.set_nodelay(true).expect("Could not set NO_DELAY");
-        let request_bytes = receive_data(stream);
+        let request_bytes = receive_data(stream).expect("Message should not exceed maximum size");
         let request: RegistryRequest = unmarshal(&request_bytes)?;
         let response: RegistryResponse = self.handle_request(request);
         let response_bytes = marshal(&response)?;

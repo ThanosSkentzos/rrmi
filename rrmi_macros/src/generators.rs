@@ -128,7 +128,7 @@ pub fn gen_handle_connection(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
     quote! {
         #instrument
         fn handle_connection_gen(&self, stream: &mut ::rrmi::TcpStream) -> ::rrmi::RMIResult<()> {
-            let request_bytes = ::rrmi::receive_data(stream);
+            let request_bytes = ::rrmi::receive_data(stream).expect("Message should not exceed max size");
             let request: #req_name = ::rrmi::unmarshal(&request_bytes)?;
 
             let response: #res_name = self.handle_request_gen(request);

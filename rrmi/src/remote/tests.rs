@@ -201,7 +201,7 @@ mod tests {
     fn block_receiver(port: u16) -> Vec<u8> {
         let l = TcpListener::bind(format!("0.0.0.0:{}", port)).expect("should be able to get port");
         let (mut stream, _) = l.accept().expect("send message from skel");
-        receive_data(&mut stream)
+        receive_data(&mut stream).expect("Message should not exceed max size")
     }
 
     fn block_sender(host: &str, port: u16) {

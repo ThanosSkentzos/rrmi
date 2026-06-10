@@ -6,7 +6,13 @@ use std::fmt::Debug;
 use crate::RMI_ID;
 use crate::remote::RMIResult;
 use crate::stub::{Deserialize, Serialize};
-pub use tcp::{IpAddr, SocketAddr, TcpClient, TcpListener, TcpStream, receive_data, send_data};
+#[cfg(feature = "bench_tcp")]
+pub use tcp::{
+    _send_data_combined, _send_data_separate, _send_data_separate_flush, _send_data_ioslice,
+};
+pub use tcp::{
+    IpAddr, SocketAddr, TcpClient, TcpListener, TcpServer, TcpStream, receive_data, send_data,
+};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[allow(dead_code)]

@@ -12,3 +12,8 @@ extern crate self as rrmi;
 pub use remote::{RMIResult, RemoteRef};
 pub use stub::{Stub, marshal, unmarshal};
 pub use transport::{TcpClient, TcpStream, Transport, receive_data, send_data, utils};
+
+#[cfg(feature = "bench_tcp")]
+pub use transport::{
+    _send_data_combined, _send_data_ioslice, _send_data_separate, _send_data_separate_flush,
+};

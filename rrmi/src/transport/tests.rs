@@ -107,12 +107,12 @@ mod tests_transport {
         // let mut stream = TcpStream::connect(addr).unwrap();
         let listener = TcpListener::bind(addr).expect("should be free");
         let (mut stream, _) = listener.accept().expect("should send");
-        let bytes = receive_data(&mut stream);
+        let bytes = receive_data(&mut stream).expect("should not exceed max size");
         let num_recv: i32 = unmarshal(&bytes).expect("i32");
         assert_eq!(num_recv, num);
 
         let req = RMIRequest::default();
-        let bytes = receive_data(&mut stream);
+        let bytes = receive_data(&mut stream).expect("should not exceed max size");
         let req_recv: RMIRequest = unmarshal(&bytes).expect("RMIRequest");
         assert_eq!(req_recv, req);
     }

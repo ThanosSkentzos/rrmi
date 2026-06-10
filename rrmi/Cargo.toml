@@ -23,8 +23,14 @@ name = "socket_benchmark"
 harness = false
 required-features = ["bench"]
 
+[[bench]]
+name = "tcp_benchmarks"
+harness = false
+required-features = ["bench_tcp"]
+
 [features]
 bench = []
+bench_tcp = []
 tracing = [
     "dep:tracing",
     "dep:tracing-chrome",

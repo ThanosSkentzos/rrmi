@@ -60,7 +60,7 @@ mod tests_transport {
     };
 
     use crate::{
-        marshal, receive_data, send_data, transport::RMIRequest, unmarshal, utils::get_addr,
+        marshal, receive_bytes, send_bytes, transport::RMIRequest, unmarshal, utils::get_addr,
     };
     static HOSTNAME_RECV: &str = "0065074.student.liacs.nl";
     static LOCAL_GET_SEND: u16 = 10999;
@@ -107,12 +107,12 @@ mod tests_transport {
         // let mut stream = TcpStream::connect(addr).unwrap();
         let listener = TcpListener::bind(addr).expect("should be free");
         let (mut stream, _) = listener.accept().expect("should send");
-        let bytes = receive_data(&mut stream).expect("should not exceed max size");
+        let bytes = receive_bytes(&mut stream).expect("should not exceed max size");
         let num_recv: i32 = unmarshal(&bytes).expect("i32");
         assert_eq!(num_recv, num);
 
         let req = RMIRequest::default();
-        let bytes = receive_data(&mut stream).expect("should not exceed max size");
+        let bytes = receive_bytes(&mut stream).expect("should not exceed max size");
         let req_recv: RMIRequest = unmarshal(&bytes).expect("RMIRequest");
         assert_eq!(req_recv, req);
     }
@@ -125,10 +125,10 @@ mod tests_transport {
         eprintln!("data: {:?}", int);
         eprintln!("serialized: {:?}", int_bytes);
 
-        let _ = send_data(int_bytes.clone(), &mut stream);
+        let _ = send_bytes(int_bytes.clone(), &mut stream);
 
         let request = RMIRequest::default();
         let request_bytes = marshal(&request).expect("RMIRequest is serializable");
-        let _ = send_data(request_bytes, &mut stream);
+        let _ = send_bytes(request_bytes, &mut stream);
     }
 }

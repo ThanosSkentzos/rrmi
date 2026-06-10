@@ -3,8 +3,8 @@ pub type RMI_ID = usize;
 use super::{RemoteObject, RemoteRef};
 use crate::error::RMIError;
 use crate::stub::Skeleton;
-use crate::transport::SocketAddr;
 use crate::transport::utils::{get_addr, get_local_ips};
+use crate::transport::{SocketAddr, TcpServer};
 
 // use rrmi_macros::remote_object;
 use std::collections::HashMap;
@@ -120,7 +120,7 @@ impl Registry {
         //! name -> remote ref | for client
         let id = self.get_id(name)?;
         let skeleton = self.get(id)?;
-        let port = skeleton.listen()?;
+        let port = skeleton.listen::<TcpServer>()?;
         let addr = self
             .construct_addr(port)
             .map_err(|_| RMIError::TransportError("Cannot get local ip".to_string()))?;
@@ -262,8 +262,8 @@ impl Registry {
 // Remote object code
 // this could also be generated from the macro
 use ::rrmi::stub::{Deserialize, Serialize, Stub};
-use ::rrmi::transport::{TcpClient, TcpStream, Transport};
-use rrmi::{marshal, receive_data, send_data, unmarshal};
+use ::rrmi::transport::{TcpClient, TcpStream, TransportClient};
+use rrmi::{marshal, receive_bytes, send_bytes, unmarshal};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum RegistryRequest {
@@ -290,11 +290,11 @@ impl Registry {
     #[cfg_attr(feature = "tracing", instrument)]
     fn handle_connection(&self, stream: &mut TcpStream) -> RMIResult<()> {
         stream.set_nodelay(true).expect("Could not set NO_DELAY");
-        let request_bytes = receive_data(stream).expect("Message should not exceed maximum size");
+        let request_bytes = receive_bytes(stream).expect("Message should not exceed maximum size");
         let request: RegistryRequest = unmarshal(&request_bytes)?;
         let response: RegistryResponse = self.handle_request(request);
         let response_bytes = marshal(&response)?;
-        send_data(response_bytes, stream)
+        send_bytes(response_bytes, stream)
     }
     #[cfg_attr(feature = "tracing", instrument)]
     fn handle_request(&self, req: RegistryRequest) -> RegistryResponse {
@@ -320,7 +320,7 @@ impl RegistryStub {
         let req = RegistryRequest::Lookup {
             name: name.to_string(),
         };
-        let resp: RegistryResponse = transport.send(req)?;
+        let resp: RegistryResponse = transport.send_req(req)?;
         match resp {
             RegistryResponse::Lookup(Ok(res)) => Ok(Stub::new(res)),
             _ => Err(RMIError::TransportError("Wrong response".to_string())),
@@ -330,7 +330,7 @@ impl RegistryStub {
     pub fn list(&self) -> RMIResult<Vec<String>> {
         let transport = TcpClient::new(self.remote.addr);
         let req = RegistryRequest::List {};
-        let resp: RegistryResponse = transport.send(req)?;
+        let resp: RegistryResponse = transport.send_req(req)?;
         match resp {
             RegistryResponse::List(res) => res,
             _ => Err(RMIError::TransportError("Wrong response".to_string())),

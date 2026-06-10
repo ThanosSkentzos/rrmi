@@ -6,9 +6,9 @@ mod tests {
     use crate::utils::get_local_ips;
     use crate::{RMIError, create_registry};
     use crate::{
-        receive_data,
+        receive_bytes,
         remote::{MockRemoteObject, MockRemoteObjectStub},
-        send_data,
+        send_bytes,
         stub::{Stub, marshal, unmarshal},
     };
     use core::{panic, time};
@@ -201,13 +201,13 @@ mod tests {
     fn block_receiver(port: u16) -> Vec<u8> {
         let l = TcpListener::bind(format!("0.0.0.0:{}", port)).expect("should be able to get port");
         let (mut stream, _) = l.accept().expect("send message from skel");
-        receive_data(&mut stream).expect("Message should not exceed max size")
+        receive_bytes(&mut stream).expect("Message should not exceed max size")
     }
 
     fn block_sender(host: &str, port: u16) {
         let socket = format!("{host}:{}", port);
         let mut stream = ensure_connect(&socket);
         let data_serial = vec![0];
-        let _ = send_data(data_serial, &mut stream);
+        let _ = send_bytes(data_serial, &mut stream);
     }
 }

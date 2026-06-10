@@ -2,16 +2,18 @@ mod tcp;
 mod tests;
 pub mod utils;
 use std::fmt::Debug;
+use std::sync::Arc;
 
 use crate::RMI_ID;
 use crate::remote::RMIResult;
+use crate::remote::RemoteObject;
 use crate::stub::{Deserialize, Serialize};
 #[cfg(feature = "bench_tcp")]
 pub use tcp::{
-    _send_data_combined, _send_data_separate, _send_data_separate_flush, _send_data_ioslice,
+    _send_data_combined, _send_data_ioslice, _send_data_separate, _send_data_separate_flush,
 };
 pub use tcp::{
-    IpAddr, SocketAddr, TcpClient, TcpListener, TcpServer, TcpStream, receive_data, send_data,
+    IpAddr, SocketAddr, TcpClient, TcpListener, TcpServer, TcpStream, receive_bytes, send_bytes,
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -33,8 +35,8 @@ impl Default for RMIRequest {
 }
 
 #[cfg(feature = "tracing")]
-pub trait Transport {
-    fn send<
+pub trait TransportClient {
+    fn send_req<
         REQ: Serialize + for<'de> Deserialize<'de> + Debug,
         RES: Serialize + for<'de> Deserialize<'de> + Debug,
     >(
@@ -44,12 +46,18 @@ pub trait Transport {
 }
 
 #[cfg(not(feature = "tracing"))]
-pub trait Transport {
-    fn send<
+pub trait TransportClient {
+    fn send_req<
         REQ: Serialize + for<'de> Deserialize<'de>,
         RES: Serialize + for<'de> Deserialize<'de>,
     >(
         &self,
         req: REQ,
     ) -> RMIResult<RES>;
+}
+
+pub trait TransportServer: Send + Sync + 'static {
+    fn new(obj: Arc<dyn RemoteObject>) -> Self;
+    fn get_address(&self) -> SocketAddr;
+    fn listen(&self);
 }

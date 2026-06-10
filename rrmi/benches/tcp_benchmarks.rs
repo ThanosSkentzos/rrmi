@@ -5,7 +5,7 @@ use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 #[cfg(feature = "bench_tcp")]
 use rrmi::{
     _send_data_combined, _send_data_ioslice, _send_data_separate, _send_data_separate_flush,
-    receive_data,
+    receive_bytes,
 };
 use std::hint::black_box; // adjust import
 use std::io::Read;

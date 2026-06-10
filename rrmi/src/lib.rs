@@ -11,7 +11,9 @@ pub use error::RMIError;
 extern crate self as rrmi;
 pub use remote::{RMIResult, RemoteRef};
 pub use stub::{Stub, marshal, unmarshal};
-pub use transport::{TcpClient, TcpStream, Transport, receive_data, send_data, utils};
+pub use transport::{
+    TcpClient, TcpStream, TransportClient, TransportServer, receive_bytes, send_bytes, utils,
+};
 
 #[cfg(feature = "bench_tcp")]
 pub use transport::{

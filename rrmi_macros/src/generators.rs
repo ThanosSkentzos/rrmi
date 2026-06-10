@@ -62,12 +62,12 @@ pub fn gen_stub(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
         let param_names = params.iter().map(|p| fix_ref_when_called(&p.0));
 
         let fn_contents = quote! {
-            use ::rrmi::Transport;
+            use ::rrmi::TransportClient;
             let transport_client = &self.transport_client;
             let req = #req_name::#camel{
                 #(#param_names),*
             };
-            let resp : #res_name = transport_client.send(req)?;
+            let resp : #res_name = transport_client.send_req(req)?;
             match resp{
                 #pattern => #expr,
                 _ => Err(::rrmi::RMIError::TransportError("Wrong response".to_string())),
@@ -128,13 +128,13 @@ pub fn gen_handle_connection(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
     quote! {
         #instrument
         fn handle_connection_gen(&self, stream: &mut ::rrmi::TcpStream) -> ::rrmi::RMIResult<()> {
-            let request_bytes = ::rrmi::receive_data(stream).expect("Message should not exceed max size");
+            let request_bytes = ::rrmi::receive_bytes(stream).expect("Message should not exceed max size");
             let request: #req_name = ::rrmi::unmarshal(&request_bytes)?;
 
             let response: #res_name = self.handle_request_gen(request);
 
             let response_bytes = ::rrmi::marshal(&response)?;
-            ::rrmi::send_data(response_bytes, stream)
+            ::rrmi::send_bytes(response_bytes, stream)
     }
     }
 }

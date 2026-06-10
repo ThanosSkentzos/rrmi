@@ -4,12 +4,14 @@ use std::io::{ErrorKind, IoSlice, Read, Write};
 pub use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 use std::sync::Arc;
 
+use crate::TransportServer;
 use crate::stub::{Deserialize, Serialize};
 
 use crate::error::RMIError;
 use crate::remote::{RMIResult, RemoteObject};
 use crate::stub::{marshal, unmarshal};
-use crate::transport::Transport;
+use crate::transport::TransportClient;
+use crate::utils::get_tcp_socket_os;
 
 #[cfg(feature = "tracing")]
 use tracing::instrument;
@@ -17,19 +19,8 @@ use tracing::instrument;
 use tracing::{Level, span};
 
 #[cfg_attr(feature = "tracing", instrument)]
-pub fn send_data(data_serial: Vec<u8>, stream: &mut TcpStream) -> RMIResult<()> {
-    //TODO: find a way of sending just the data, not the size first
+pub fn send_bytes(data_serial: Vec<u8>, stream: &mut TcpStream) -> RMIResult<()> {
     _send_data_ioslice(data_serial, stream)
-    // let len = (data_serial.len() as u32).to_be_bytes();
-
-    // let mut buf = Vec::with_capacity(4 + data_serial.len());
-    // buf.extend_from_slice(&len);
-    // buf.extend_from_slice(&data_serial);
-    // let _ = stream
-    //     .write_all(&buf)
-    //     .map_err(|e| RMIError::TransportError(e.to_string()));
-
-    // Ok(())
 }
 
 pub fn _send_data_separate(data_serial: Vec<u8>, stream: &mut TcpStream) -> RMIResult<()> {
@@ -84,7 +75,7 @@ pub fn _send_data_ioslice(data_serial: Vec<u8>, stream: &mut TcpStream) -> RMIRe
 }
 
 #[cfg_attr(feature = "tracing", instrument)]
-pub fn receive_data(stream: &mut TcpStream) -> RMIResult<Vec<u8>> {
+pub fn receive_bytes(stream: &mut TcpStream) -> RMIResult<Vec<u8>> {
     let mut len = [0u8; 4];
     stream.read_exact(&mut len).map_err(|e| match e.kind() {
         ErrorKind::UnexpectedEof => RMIError::TransportError("connection closed".into()),
@@ -135,8 +126,8 @@ impl TcpClient {
     }
 }
 #[cfg(feature = "tracing")]
-impl Transport for TcpClient {
-    fn send<
+impl TransportClient for TcpClient {
+    fn send_req<
         REQ: Serialize + for<'de> Deserialize<'de> + Debug,
         RES: Serialize + for<'de> Deserialize<'de> + Debug,
     >(
@@ -147,12 +138,12 @@ impl Transport for TcpClient {
         let request_serialized = marshal(&req)?;
         // eprintln!("send_data");
         let mut stream = self.stream.borrow_mut();
-        send_data(request_serialized, &mut stream).map_err(|e| {
+        send_bytes(request_serialized, &mut stream).map_err(|e| {
             eprintln!("send_data failed: {e:?}");
             e
         })?;
         // eprintln!("receive_data");
-        let response_bytes = receive_data(&mut stream);
+        let response_bytes = receive_bytes(&mut stream).expect("Message exceeded maximum size");
         // eprintln!("unmarshaling");
         let response: RES = unmarshal(&response_bytes)?;
         Ok(response)
@@ -160,8 +151,8 @@ impl Transport for TcpClient {
 }
 
 #[cfg(not(feature = "tracing"))]
-impl Transport for TcpClient {
-    fn send<
+impl TransportClient for TcpClient {
+    fn send_req<
         REQ: Serialize + for<'de> Deserialize<'de>,
         RES: Serialize + for<'de> Deserialize<'de>,
     >(
@@ -172,12 +163,12 @@ impl Transport for TcpClient {
         let request_serialized = marshal(&req)?;
         // eprintln!("send_data");
         let mut stream = self.stream.borrow_mut();
-        send_data(request_serialized, &mut stream).map_err(|e| {
+        send_bytes(request_serialized, &mut stream).map_err(|e| {
             eprintln!("send_data failed: {e:?}");
             e
         })?;
         // eprintln!("receive_data");
-        let response_bytes = receive_data(&mut stream).expect("Message exceeded maximum size");
+        let response_bytes = receive_bytes(&mut stream).expect("Message exceeded maximum size");
         // eprintln!("unmarshaling");
         let response: RES = unmarshal(&response_bytes)?;
         Ok(response)
@@ -189,14 +180,19 @@ pub struct TcpServer {
     obj: Arc<dyn RemoteObject>,
 }
 
-impl TcpServer {
-    pub fn new(listener: TcpListener, obj: Arc<dyn RemoteObject>) -> Self {
+impl TransportServer for TcpServer {
+    fn new(obj: Arc<dyn RemoteObject>) -> Self {
+        let listener = get_tcp_socket_os().expect("Was unable to get address");
         Self { listener, obj }
     }
-}
 
-impl TcpServer {
-    pub fn listen(&self) {
+    fn get_address(&self) -> SocketAddr {
+        self.listener
+            .local_addr()
+            .expect(&format!("{}: does not have an address", self.obj.name()))
+    }
+
+    fn listen(&self) {
         let stream = self.listener.accept();
 
         match stream {
@@ -212,7 +208,8 @@ impl TcpServer {
             Err(e) => eprintln!("Transport error:{e}"),
         };
     }
-
+}
+impl TcpServer {
     fn receive_loop(&self, mut stream: TcpStream, peer: SocketAddr) {
         let mut buf = [0u8; 4];
         loop {

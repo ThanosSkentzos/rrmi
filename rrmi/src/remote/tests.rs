@@ -73,7 +73,7 @@ mod tests {
                 for n in 0..per_thread {
                     let guard = r.lock().expect("should be able to lock");
                     let name = format!("{thread}-{n}");
-                    guard.remove(&name).expect("should still have this process");
+                    guard.unbind(&name).expect("should still have this process");
                     drop(guard);
                 }
             });
@@ -105,12 +105,12 @@ mod tests {
         let l = reg.list().expect("two already in");
         let l_rmt = rmt_reg.list().expect("same");
         eprintln!("local: {:?} vs remote: {:?}", l, l_rmt);
-        reg.remove("verbose").expect("still in");
+        reg.unbind("verbose").expect("still in");
 
         let l = reg.list().expect("one still in");
         let l_rmt = rmt_reg.list().expect("same");
         eprintln!("local: {:?} vs remote: {:?}", l, l_rmt);
-        reg.remove("silent").expect("still in");
+        reg.unbind("silent").expect("still in");
 
         match reg.list() {
             Ok(_) => panic!("should not have any other objects"),

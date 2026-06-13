@@ -21,15 +21,21 @@ where
 }
 
 #[cfg(not(feature = "tracing"))]
+#[cfg_attr(feature = "tracing", instrument)]
 pub fn marshal<T: Serialize>(data: &T) -> RMIResult<Vec<u8>> {
     serde_cbor::to_vec(&data).map_err(|e| {
         eprintln!("Marshaling error: {e}");
         RMIError::SerializationError(e.to_string())
     })
+    // TODO: perhaps i can use this to write directly to stream
+    // serde_cbor::to_writer(stream, &data)
 }
 
 #[cfg_attr(feature = "tracing", instrument)]
-pub fn unmarshal<T: for<'de> Deserialize<'de>>(bytes: &Vec<u8>) -> RMIResult<T> {
+pub fn unmarshal<T>(bytes: &Vec<u8>) -> RMIResult<T>
+where
+    T: for<'de> Deserialize<'de>,
+{
     serde_cbor::from_slice(&bytes).map_err(|e| {
         eprintln!("Unmarshaling error: {e} on bytes: {bytes:?}");
         RMIError::DeserializationError(e.to_string())

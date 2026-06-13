@@ -19,7 +19,10 @@ impl Skeleton {
     }
 
     #[cfg_attr(feature = "tracing", instrument)]
-    pub fn listen<Server: TransportServer + Send + Sync>(&self) -> RMIResult<u16> {
+    pub fn listen<Server>(&self) -> RMIResult<u16>
+    where
+        Server: TransportServer + Send + Sync,
+    {
         let obj_clone = Arc::clone(&self.object);
         let object_name = obj_clone.name();
 

@@ -66,37 +66,14 @@ impl Registry {
     }
 
     #[cfg_attr(feature = "tracing", instrument)]
-    pub fn remove(&self, name: &str) -> RMIResult<()> {
-        let mut names = self
-            .names
-            .lock()
-            .expect("Registry: unable to get names lock");
-        let id = names
-            .get(name)
-            .cloned()
-            .ok_or(RMIError::NameNotFound(name.to_string()))?;
-        names.remove(name);
-        let mut objects = self
-            .objects
-            .lock()
-            .expect("Registry: unable to get objects lock");
-        let _sk = objects.remove(&id).ok_or(RMIError::ObjectNotFound(id))?;
-        // todo!("make sure the object is also droped");
-        // let left = objects.keys().count();
-        // let strong = Arc::strong_count(&sk);
-        // let weak = Arc::strong_count(&sk);
-        // eprintln!("removed: now strong, weak = {strong},{weak} remaining: {left}");
-        Ok(())
-    }
-
-    #[cfg_attr(feature = "tracing", instrument)]
     pub fn get_id(&self, name: &str) -> RMIResult<RMI_ID> {
         let names = self
             .names
             .lock()
             .expect("Registry: unable to get names lock");
         let id = names
-            .get(name).copied()
+            .get(name)
+            .copied()
             .ok_or(RMIError::NameNotFound(name.to_string()));
         id
     }
@@ -161,9 +138,28 @@ impl Registry {
         (arc_object, id)
     }
 
-    pub fn unbind(&self) {
-        todo!()
-        // switch variable to unbind
+    #[cfg_attr(feature = "tracing", instrument)]
+    pub fn unbind(&self, name: &str) -> RMIResult<()> {
+        let mut names = self
+            .names
+            .lock()
+            .expect("Registry: unable to get names lock");
+        let id = names
+            .get(name)
+            .cloned()
+            .ok_or(RMIError::NameNotFound(name.to_string()))?;
+        names.remove(name);
+        let mut objects = self
+            .objects
+            .lock()
+            .expect("Registry: unable to get objects lock");
+        let _sk = objects.remove(&id).ok_or(RMIError::ObjectNotFound(id))?;
+        // todo!("make sure the object is also droped");
+        // let left = objects.keys().count();
+        // let strong = Arc::strong_count(&sk);
+        // let weak = Arc::strong_count(&sk);
+        // eprintln!("removed: now strong, weak = {strong},{weak} remaining: {left}");
+        Ok(())
     }
 }
 /// Creates and exports a Registry instance on the local host that accepts requests on the specified port.
@@ -285,7 +281,7 @@ impl RemoteObject for Registry {
         "Registry"
     }
 }
-#[allow(dead_code)]
+
 impl Registry {
     #[cfg_attr(feature = "tracing", instrument)]
     fn handle_connection(&self, stream: &mut TcpStream) -> RMIResult<()> {

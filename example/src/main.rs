@@ -22,12 +22,14 @@ enum Liacs {
 
 #[derive(Parser, Debug)]
 struct MyArgs {
-    #[arg(short, long, value_enum, default_value_t = Local::False)]
-    local: Local,
+    #[arg(long)]
+    local: bool,
+
+    #[arg(default_value_t=10_000)]
     num_calls: usize,
 
-    #[arg(long, value_enum, default_value_t = Liacs::False)]
-    liacs: Liacs,
+    #[arg(long)]
+    liacs: bool,
 }
 fn main() {
     #[cfg(feature = "tracing")]
@@ -39,15 +41,15 @@ fn main() {
     eprintln!("{args:?}");
     let num_calls = args.num_calls;
     match args.local {
-        Local::True => {
+        true => {
             eprintln!("RUNNING LOCAL");
             run_local(num_calls);
         }
-        Local::False => {
+        false => {
             eprintln!("RUNNING REMOTE");
             match args.liacs {
-                Liacs::False => run_remote_das(num_calls),
-                Liacs::True => run_remote_liacs(num_calls),
+                false => run_remote_das(num_calls),
+                true => run_remote_liacs(num_calls),
             }
         }
     }

@@ -256,7 +256,7 @@ impl TcpServer {
             #[cfg(feature = "tracing")]
             drop(_enter);
 
-            match self.obj.run(&mut stream) {
+            match self.obj.handle_connection(&mut stream) {
                 Ok(_) => {}
                 Err(e) => {
                     eprintln!(

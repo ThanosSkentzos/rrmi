@@ -77,7 +77,7 @@ impl Registry {
             .ok_or(RMIError::NameNotFound(name.to_string()));
         id
     }
-    
+
     #[cfg_attr(feature = "tracing", instrument)]
     pub fn get(&self, id: RMI_ID) -> RMIResult<Arc<Skeleton>> {
         //! RMI_ID -> Skeleton | for server
@@ -242,7 +242,7 @@ impl Registry {
                     match stream {
                         Ok(mut stream) => {
                             eprintln!("Registry received connection from {:?}", stream.peer_addr());
-                            if let Err(e) = self_clone.run(&mut stream) {
+                            if let Err(e) = self_clone.handle_connection(&mut stream) {
                                 eprintln!("Error: {e} when handling connection");
                             }
                         }
@@ -274,15 +274,6 @@ pub enum RegistryResponse {
 }
 
 impl RemoteObject for Registry {
-    fn run(&self, stream: &mut TcpStream) -> RMIResult<()> {
-        self.handle_connection(stream)
-    }
-    fn name(&self) -> &'static str {
-        "Registry"
-    }
-}
-
-impl Registry {
     #[cfg_attr(feature = "tracing", instrument)]
     fn handle_connection(&self, stream: &mut TcpStream) -> RMIResult<()> {
         stream.set_nodelay(true).expect("Could not set NO_DELAY");
@@ -292,6 +283,13 @@ impl Registry {
         let response_bytes = marshal(&response)?;
         send_bytes(response_bytes, stream)
     }
+
+    fn name(&self) -> &'static str {
+        "Registry"
+    }
+}
+
+impl Registry {
     #[cfg_attr(feature = "tracing", instrument)]
     fn handle_request(&self, req: RegistryRequest) -> RegistryResponse {
         match req {

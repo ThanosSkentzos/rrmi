@@ -3,7 +3,7 @@ mod structure;
 mod utils;
 
 use crate::{
-    generators::{gen_enums, gen_handle_connection, gen_handle_request, gen_remote_obj, gen_stub},
+    generators::{gen_enums, gen_handle_request, gen_remote_obj, gen_stub},
     structure::RemoteObjectInfo,
 };
 use proc_macro::TokenStream;
@@ -20,7 +20,6 @@ pub fn remote_object(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let struct_name = &remote_obj.struct_name.0;
     let enums = gen_enums(&remote_obj);
-    let handle_connection = gen_handle_connection(&remote_obj);
     let handle_request = gen_handle_request(&remote_obj);
     // let listen = gen_listen(&remote_obj);
     let stub = gen_stub(&remote_obj);
@@ -32,7 +31,6 @@ pub fn remote_object(_attr: TokenStream, item: TokenStream) -> TokenStream {
             #original
             #impl_remote_obj
             impl #struct_name{
-                #handle_connection
                 #handle_request
             }
         }
@@ -47,7 +45,6 @@ pub fn remote_object(_attr: TokenStream, item: TokenStream) -> TokenStream {
     const _: () = {
         // #_err
         impl #struct_name{
-            #handle_connection
             #handle_request
         }
     };

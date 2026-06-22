@@ -12,6 +12,7 @@ pub struct RemoteRef {
     //should point to RemoteObject on the server side
     pub addr: SocketAddr, // 127.0.0.1:8080 for example
     pub id: RMI_ID,       // just a num for identity
+                          // pub reg_addr: SocketAddr,//registry_addr for a lookup if we want a ref borrow
 }
 
 impl RemoteRef {
@@ -25,12 +26,10 @@ impl RemoteRef {
 }
 
 pub trait RemoteObject: Send + Sync {
-    fn run(&self, stream: &mut TcpStream) -> RMIResult<()>;
 
     fn name(&self) -> &'static str;
 
-    // fn listen(self: &Arc<Self>) -> RMIResult<u16>;
-    // CANNOT USE AS DYNAMIC WITH &Arc ref
+    fn handle_connection(&self, stream: &mut TcpStream) -> RMIResult<()>;
 
     // fn handle_request<ObjReq, ObjRes>(&self, req: ObjReq) -> ObjRes;
     //CANNOT USE AS DYNAMIC WITH generic types

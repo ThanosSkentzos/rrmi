@@ -8,19 +8,11 @@ use crate::{
 
 pub fn gen_remote_obj(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
     let struct_name = &remote_obj.struct_name.0;
-    #[cfg(not(feature = "tracing"))]
-    let instrument = quote! {};
-    #[cfg(feature = "tracing")]
-    let instrument = quote! {
-        #[allow(unexpected_cfgs)]
-        #[cfg_attr(feature = "tracing", ::tracing::instrument)]
-    };
+    let handle_connection_gen = gen_handle_connection(remote_obj);
     quote! {
         impl RemoteObject for #struct_name{
-            #instrument
-            fn run(&self, stream: &mut ::rrmi::TcpStream) -> ::rrmi::RMIResult<()> {
-                self.handle_connection_gen(stream)
-        }
+            #handle_connection_gen
+
             fn name(&self) -> &'static str{
                 stringify!(#struct_name)
             }
@@ -127,7 +119,7 @@ pub fn gen_handle_connection(remote_obj: &RemoteObjectInfo) -> TokenStream2 {
     };
     quote! {
         #instrument
-        fn handle_connection_gen(&self, stream: &mut ::rrmi::TcpStream) -> ::rrmi::RMIResult<()> {
+        fn handle_connection(&self, stream: &mut ::rrmi::TcpStream) -> ::rrmi::RMIResult<()> {
             let request_bytes = ::rrmi::receive_bytes(stream).expect("Message should not exceed max size");
             let request: #req_name = ::rrmi::unmarshal(&request_bytes)?;
 

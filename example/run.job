@@ -14,4 +14,4 @@
 # Set environment variables if needed (e.g., OMP_NUM_THREADS when using OpenMP)
 
 # Run the binary with arguments
-./target/debug/example -l true 100
+./target/release/example -l true 100

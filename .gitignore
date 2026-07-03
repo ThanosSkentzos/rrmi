@@ -5,3 +5,5 @@ trace*
 flamegraph*
 perf*.data*
 vendor/*
+*err*
+*out*

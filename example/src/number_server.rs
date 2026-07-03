@@ -377,33 +377,49 @@ pub fn server(experiment: fn(u8, usize), num_clients: u8, num_calls: usize) {
     eprintln!("Total time|count: {time:?}|{final_num}");
     eprintln!("Average: {:?}", time / final_num);
 
-    eprintln!("================= NUMBER =================");
-    let nums_time = num_server.get_num_info();
+    let num_time = num_server.get_num_info();
     let num_size = size_of_val(&final_num);
     let num_count = num_clients as usize * num_calls;
-    print_statistics(nums_time, num_count, num_size);
+    print_statistics(num_clients, "Sequence", num_time, num_count, num_size);
 
-    eprintln!("================= VECTOR =================");
     let vecs_time = num_server.get_arr_info();
     let vec_size = size_of::<f64>() * VEC_LEN;
     let vec_count = num_clients as usize * NUM_VECS;
-    print_statistics(vecs_time, vec_count, vec_size);
+    print_statistics(num_clients, "Vector", vecs_time, vec_count, vec_size);
 
-    eprintln!("================= HASHMAP =================");
-    let (time_hash, hashmaps_size) = num_server.get_hashmap_info();
-    let hashmap_count = num_clients as usize * NUM_HASH;
-    let hashmaps_avg_size = hashmaps_size / hashmap_count;
-    print_statistics(time_hash, hashmap_count, hashmaps_avg_size);
+    let (hash_time, hashmaps_size) = num_server.get_hashmap_info();
+    let hash_count = num_clients as usize * NUM_HASH;
+    let hash_avg_size = hashmaps_size / hash_count;
+    print_statistics(num_clients, "Hashmap", hash_time, hash_count, hash_avg_size);
 }
 
-fn print_statistics(total_time: Duration, total_count: usize, avegare_size: usize) {
+fn print_statistics(
+    num_clients: u8,
+    label: &str,
+    total_time: Duration,
+    total_count: usize,
+    avegare_size: usize,
+) {
     let bytes_to_bits: f32 = 8.0;
     let average_rtt = total_time / total_count as u32;
     let throughput = bytes_to_bits * avegare_size as f32 / average_rtt.as_secs_f32();
+    eprintln!("================= {label} =================");
     eprintln!("Total time|calls server: {total_time:?}|{total_count}");
     eprintln!("Average roundtrip: {average_rtt:?}");
     eprintln!("Average lat: {:?}", average_rtt / 2);
     eprintln!("Average throughput: {:?} bps", throughput);
+
+    println!("NClients,Type,TotalCalls,Time,MicrosPerCall,Latency,Throughput");
+    println!(
+        "{},{},{},{},{},{},{}",
+        num_clients,
+        label,
+        total_count,
+        total_time.as_micros(),
+        average_rtt.as_micros(),
+        average_rtt.as_micros() / 2,
+        throughput
+    )
 }
 pub fn run_local(num_calls: usize) {
     server(run_clients_local, NUM_CLIENTS_LOCAL, num_calls);

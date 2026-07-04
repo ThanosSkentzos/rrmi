@@ -55,19 +55,20 @@ mod tests {
 #[cfg(test)]
 mod tests_transport {
     use std::{
-        net::{TcpListener, TcpStream},
+        net::{IpAddr, Ipv4Addr, TcpListener, TcpStream},
+        str::FromStr,
         thread,
     };
 
     use crate::{
-        marshal, receive_bytes, send_bytes, transport::RMIRequest, unmarshal, utils::get_addr,
+        marshal, receive_bytes, send_bytes, transport::RMIRequest, unmarshal, utils::{get_addr, get_ib_hostname},
     };
     static HOSTNAME_RECV: &str = "0065074.student.liacs.nl";
     static LOCAL_GET_SEND: u16 = 10999;
     static REMOTE_GET_SEND: u16 = 11000;
 
     #[test]
-    #[ignore]
+    #[ignore = "Only in liacs"]
     fn liacs_ips() {
         let hostname = "0.0.0.0";
         get_addr(hostname, 1099);
@@ -77,6 +78,23 @@ mod tests_transport {
         get_addr(hostname, 1099);
         let hostname = "0065073.student.liacs.nl";
         get_addr(hostname, 1099);
+    }
+
+    #[test]
+    #[ignore = "Only on das"]
+    fn das_ips() {
+        let hostname = "node114";
+        get_addr(hostname, 1099);
+        let ip_114 = IpAddr::V4(Ipv4Addr::from_str("10.149.1.14").unwrap());
+        eprintln!("Looking for node114 though ip ip at {ip_114}");
+        let res = dns_lookup::lookup_addr(&ip_114).unwrap();
+        eprintln!("got {res:?}");
+        eprintln!("dns_lookup for {res:?}");
+        get_addr(&res, 1099);
+        let ib_hostname = get_ib_hostname(hostname);
+        eprintln!("ok then also lookup for {ib_hostname}");
+        let addr_114 = get_addr(&ib_hostname, 1099);
+        assert_eq!(addr_114.ip(), ip_114)
     }
 
     #[test]

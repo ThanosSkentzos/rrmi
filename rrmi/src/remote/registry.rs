@@ -5,6 +5,7 @@ use crate::error::RMIError;
 use crate::stub::Skeleton;
 use crate::transport::utils::{get_addr, get_local_ips};
 use crate::transport::{SocketAddr, TcpServer};
+use crate::utils::{get_local_ifs, get_my_hostname};
 
 // use rrmi_macros::remote_object;
 use std::collections::HashMap;
@@ -44,8 +45,8 @@ impl Registry {
         let ips = get_local_ips().map_err(|e| eprintln!("Error getting local ip: {e:?}"));
         match ips {
             Ok(ips) => {
-                let ip = ips[0];
-                Ok(ip)
+                let (_name, ip) = &ips[0];
+                Ok(*ip)
             }
             Err(_) => Err(()),
         }
@@ -54,11 +55,21 @@ impl Registry {
     #[cfg_attr(feature = "tracing", instrument)]
     pub fn construct_addr(&self, port: u16) -> Result<SocketAddr, ()> {
         // this will be slower than just saving it
-        let ips = get_local_ips().map_err(|e| eprintln!("Error getting local ip: {e:?}"));
+        let ifs = get_local_ifs().map_err(|e| eprintln!("Error getting local interfaces: {e:?}"));
         //TODO: handle multiple ips case
-        match ips {
-            Ok(ips) => {
-                let ip = ips[0];
+        let hostname = get_my_hostname();
+        eprintln!("{hostname}: Registry constructing ip for port: {port}");
+        eprintln!("{hostname}: Selecting from {ifs:?}");
+        match ifs {
+            Ok(ifs) => {
+                let _name = "eth0";
+                #[cfg(feature = "infiniband")]
+                let _name = "ib0";
+                let ips: Vec<IpAddr> = ifs.iter().filter(|i| i.name.contains(_name)).map(|i| i.ip()).collect();
+                let ip = match ips.len(){
+                    0 => ifs[0].ip(),
+                    _ => ips[0],
+                };
                 Ok(SocketAddr::new(ip, port))
             }
             Err(_) => Err(()),
@@ -238,10 +249,14 @@ impl Registry {
         let _handle_registry = std::thread::Builder::new()
             .name("Registry".to_string())
             .spawn(move || {
+                let hostname = get_my_hostname();
                 for stream in listener.incoming() {
                     match stream {
                         Ok(mut stream) => {
-                            eprintln!("Registry received connection from {:?}", stream.peer_addr());
+                            eprintln!(
+                                "{hostname}: Registry received connection from {:?}",
+                                stream.peer_addr()
+                            );
                             if let Err(e) = self_clone.handle_connection(&mut stream) {
                                 eprintln!("Error: {e} when handling connection");
                             }

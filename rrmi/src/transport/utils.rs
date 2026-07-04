@@ -1,3 +1,4 @@
+use gethostname::gethostname;
 use if_addrs::Interface;
 
 use crate::transport::tcp::{IpAddr, Ipv4Addr, SocketAddr, TcpListener};
@@ -23,10 +24,13 @@ pub fn get_tcp_socket_os() -> RMIResult<TcpListener> {
 }
 
 pub fn get_addr(hostname: &str, port: u16) -> SocketAddr {
+    #[cfg(feature = "infiniband")]
+    let hostname = &get_ib_hostname(hostname);
     let ips: Vec<IpAddr> = dns_lookup::lookup_host(hostname)
         .expect("should be able to get own address")
         .collect();
-    eprintln!("IPs for {hostname}: {ips:?}");
+    let myhostname = get_my_hostname();
+    eprintln!("{myhostname}: IPs for {hostname}: {ips:?}");
     if ips.len() == 0 {
         //fail test if not found
         panic!("unable to resolve hostname: {hostname}")
@@ -37,13 +41,13 @@ pub fn get_addr(hostname: &str, port: u16) -> SocketAddr {
         .any(|ip| ip.to_string().contains("127.0") || ip.to_string().contains("localhost"))
     {
         ip = IpAddr::from(Ipv4Addr::from_str("0.0.0.0").expect("0.0.0.0 should pass"));
-        eprintln!("{hostname} is this computer so using {ip:?}");
+        // eprintln!("{hostname} is this computer so using {ip:?}");
     }
     eprintln!("using {}:{port} for {hostname}", ip);
     SocketAddr::new(ip, port)
 }
 
-pub fn get_local_ips() -> Result<Vec<IpAddr>, ()> {
+pub fn get_local_ips() -> Result<Vec<(String,IpAddr)>, ()> {
     let ips = if_addrs::get_if_addrs()
         .map_err(|err| {
             eprintln!("Error getting ips: {err}");
@@ -51,7 +55,7 @@ pub fn get_local_ips() -> Result<Vec<IpAddr>, ()> {
         })?
         .into_iter()
         .filter(|iface| !iface.is_loopback())
-        .map(|iface| iface.ip())
+        .map(|iface| (iface.name.clone(),iface.ip()))
         .collect();
     Ok(ips)
 }
@@ -66,4 +70,15 @@ pub fn get_local_ifs() -> Result<Vec<Interface>, ()> {
         .filter(|iface| !iface.is_loopback())
         .collect();
     Ok(ifs)
+}
+
+pub fn get_ib_hostname(hostname: &str) -> String {
+    match hostname.contains("node1") {
+        true => format!("{hostname}-ib0.localdomain"),
+        false => hostname.to_string(),
+    }
+}
+
+pub fn get_my_hostname() -> String {
+    gethostname().into_string().unwrap()
 }

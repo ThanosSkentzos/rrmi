@@ -31,8 +31,9 @@ mod tests {
         let addr = reg
             .construct_addr(port)
             .expect("Registry failed to get local address");
-        let ip = get_local_ips().expect("Should be able to get ips")[0];
-        assert_eq!(addr, SocketAddr::new(ip, port))
+        let ips = get_local_ips().expect("Should be able to get ips");
+        let (_name, ip) = &ips[0];
+        assert_eq!(addr, SocketAddr::new(*ip, port))
     }
 
     #[test]

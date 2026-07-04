@@ -410,14 +410,15 @@ fn print_statistics(
     eprintln!("Average throughput: {:?} bps", throughput);
 
     println!("NClients,Type,TotalCalls,Time,MicrosPerCall,Latency,Throughput");
+    let micros_in_sec = 1_000_000.0;
     println!(
         "{},{},{},{},{},{},{}",
         num_clients,
         label,
         total_count,
-        total_time.as_micros(),
-        average_rtt.as_micros(),
-        average_rtt.as_micros() / 2,
+        total_time.as_secs_f32() * micros_in_sec,
+        average_rtt.as_secs_f32() * micros_in_sec,
+        average_rtt.as_secs_f32() * micros_in_sec / 2.0,
         throughput
     )
 }

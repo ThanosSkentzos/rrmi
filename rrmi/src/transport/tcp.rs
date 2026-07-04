@@ -11,7 +11,7 @@ use crate::error::RMIError;
 use crate::remote::{RMIResult, RemoteObject};
 use crate::stub::{marshal, unmarshal};
 use crate::transport::TransportClient;
-use crate::utils::get_tcp_socket_os;
+use crate::utils::{get_my_hostname, get_tcp_socket_os};
 
 #[cfg(feature = "tracing")]
 use tracing::instrument;
@@ -112,6 +112,12 @@ pub struct TcpClient {
 impl TcpClient {
     pub fn new(server_addr: SocketAddr) -> Self {
         let stream = TcpStream::connect(server_addr).expect("Could not connect to server");
+        let hostname = get_my_hostname();
+        eprintln!(
+            "{hostname}: TCP client connected to remote {} using {}",
+            stream.peer_addr().unwrap(),
+            stream.local_addr().unwrap()
+        );
         stream.set_nodelay(true).expect("Could not set NO_DELAY");
         let address = stream
             .local_addr()

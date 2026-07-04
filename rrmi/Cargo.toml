@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 dns-lookup = "3.0.1"
+gethostname = "1.1.0"
 if-addrs = "0.15.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_cbor = "0.11.2"
@@ -31,6 +32,7 @@ required-features = ["bench_tcp"]
 [features]
 bench = []
 bench_tcp = []
+infiniband = []
 tracing = [
     "dep:tracing",
     "dep:tracing-chrome",

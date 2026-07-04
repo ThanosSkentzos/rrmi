@@ -8,6 +8,7 @@ use tracing::{Level, span};
 
 use crate::TransportServer;
 use crate::remote::{RMIResult, RemoteObject};
+use crate::utils::get_my_hostname;
 
 pub struct Skeleton {
     object: Arc<dyn RemoteObject>, // Arc because eventually we to listen from several ports
@@ -30,7 +31,8 @@ impl Skeleton {
         // let transport_server = TcpServer::new(obj_clone);
         let addr = transport_server.get_address();
         let port = addr.port();
-        eprintln!("{object_name} uses address: {addr}");
+        let hostname = get_my_hostname();
+        eprintln!("{hostname}: {object_name} uses address: {addr}");
 
         let name = format!("Skeleton{object_name}:{port}");
         let _thread_handle_obj = std::thread::Builder::new().name(name).spawn(move || {

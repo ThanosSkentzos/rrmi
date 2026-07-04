@@ -4,7 +4,7 @@ sequenceNumberCalls=100000
 reps=10
 
 rm -f out.* err.*
-cargo build --release
+cargo build --release --features infiniband
 
 for n in $(seq 1 $reps)
 
@@ -20,9 +20,9 @@ do
 
   if [ $n -eq 1 ]
   then
-    cat out.* | grep Clients | head -n 1 > results_rust.csv
+    cat out.* | grep Clients | head -n 1 > results_rust_ib.csv
   fi
-  cat $(ls out* | sort -V) | grep -A1 --no-group-separator  Clients | grep -v Clients  >> results_rust.csv
+  cat $(ls out* | sort -V) | grep -A1 --no-group-separator  Clients | grep -v Clients  >> results_rust_ib.csv
   rm out.* err.*
 
 done

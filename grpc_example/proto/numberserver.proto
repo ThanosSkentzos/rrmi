@@ -1,0 +1,29 @@
+syntax = "proto3";
+package numberserver;
+
+service Benchmark {
+    rpc IncNum (NumRequest) returns (NumResponse);
+    rpc SendVec (VecRequest) returns (VecResponse);
+    rpc SendHashmap (HashRequest) returns (HashResponse);
+}
+
+message NumRequest {
+}
+
+message NumResponse {
+    uint32 number = 1;
+}
+
+message VecRequest {
+   repeated double vector = 1;
+}
+
+message VecResponse {
+}
+
+message HashRequest {
+   map<string,string> hashmap = 1;
+}
+
+message HashResponse {
+}

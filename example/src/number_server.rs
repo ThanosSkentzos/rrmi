@@ -17,11 +17,11 @@ use rrmi::{create_registry, get_registry, remote::RemoteObject};
 use rrmi_macros::remote_object;
 use thousands::Separable;
 static HASHMAP_LEN: usize = 100_000;
-static VEC_LEN: usize = 1_000_000;
+static VEC_LEN: usize = 500_000;
 static REG_PORT: u16 = 1099;
 // static NUM_NUMS: usize = 1000;
-static NUM_VECS: usize = 1;
-static NUM_HASH: usize = 1;
+static NUM_VECS: usize = 10;
+static NUM_HASH: usize = 10;
 static NUM_CLIENTS_LOCAL: u8 = 2;
 //=============================TRACING============================
 

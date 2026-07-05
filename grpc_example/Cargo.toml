@@ -3,14 +3,6 @@ name = "grpc_example"
 version = "0.1.0"
 edition = "2021"
 
-[[bin]]
-name = "server"
-path = "src/server.rs"
-
-[[bin]]
-name = "client"
-path = "src/client.rs"
-
 [dependencies]
 clap = { version = "4", features = ["derive"] }
 gethostname = "1.1.0"

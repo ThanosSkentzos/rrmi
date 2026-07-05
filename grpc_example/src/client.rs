@@ -1,64 +1,64 @@
-pub mod experiment {
-    tonic::include_proto!("numberserver");
-}
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
-use experiment::benchmark_client::BenchmarkClient;
-use experiment::{NumRequest, VecRequest};
+use crate::experiment::benchmark_client::BenchmarkClient;
+use crate::experiment::{
+    DoneHashRequest, DoneNumRequest, DoneVecRequest, NullResponse, NumRequest, VecRequest,
+};
+use crate::{HASHMAP_LEN, NUM_HASH, NUM_NUMS, NUM_VECS, VEC_LEN};
 
-use tonic::Request;
 use tonic::transport::Endpoint;
+use tonic::Request;
 
 use crate::experiment::HashRequest;
 
-static HASHMAP_LEN: usize = 100_000;
-static VEC_LEN: usize = 500_000;
-static NUM_NUMS: usize = 10;
-static NUM_VECS: usize = 1;
-static NUM_HASH: usize = 1;
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run_client() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let endpoint = Endpoint::from_static("http://[::1]:50051").tcp_nodelay(true);
     let mut client = BenchmarkClient::connect(endpoint).await?;
 
     let (vector, hashmap, hashmap_size) = prep_data();
     let num_start = Instant::now();
 
-    for _ in 0..NUM_NUMS - 1 {
+    for _ in 0..NUM_NUMS {
         let request = Request::new(NumRequest {});
         let _response = client.inc_num(request).await?;
     }
-    let time = num_start.elapsed();
-    eprintln!("Totam Time: {time:?}");
-    eprintln!("Num Time: {time:?}");
+    let time_num = num_start.elapsed().as_secs_f32();
+    let request = Request::new(DoneNumRequest { time_num });
+    let _response = client.set_done_num(request).await?;
+    eprintln!("{_response:?}");
 
-    let request = Request::new(NumRequest {});
-    let response = client.inc_num(request).await?;
-    let final_num = response.into_inner().number;
-    println!("Final number = {final_num}");
-    print_statistics(1, "Sequence", time, NUM_NUMS, size_of_val(&final_num));
+    let request = Request::new(NullResponse {});
+    let _ = client.barrier(request).await?;
+
+    // print_statistics(1, "Sequence", time, NUM_NUMS, size_of_val(&final_num));
 
     // VECTOR
     let request = Request::new(VecRequest { vector });
     let vec_start = Instant::now();
-    let response = client.send_vec(request).await?;
-    let vec_time = vec_start.elapsed();
-    eprintln!("Vec Time: {vec_time:?}");
+    let _response = client.send_vec(request).await?;
+    eprintln!("{_response:?}");
+    let time_vec = vec_start.elapsed().as_secs_f32();
+    let request = Request::new(DoneVecRequest { time_vec });
+    let _ = client.set_done_vec(request).await?;
+    let request = Request::new(NullResponse {});
+    let _ = client.barrier(request).await?;
 
-    println!("RESPONSE={:?}", response);
-    print_statistics(1, "Vector", vec_time, NUM_VECS, size_of::<f64>()*VEC_LEN);
+    // print_statistics(1, "Vector", vec_time, NUM_VECS, size_of::<f64>() * VEC_LEN);
 
     // HASHMAP
     let request = Request::new(HashRequest { hashmap });
     let hash_start = Instant::now();
-    let response = client.send_hashmap(request).await?;
-    let hash_time = hash_start.elapsed();
-    eprintln!("Vec Time: {hash_time:?}");
+    let _response = client.send_hashmap(request).await?;
+    eprintln!("{_response:?}");
+    let time_hash = hash_start.elapsed().as_secs_f32();
+    let request = Request::new(DoneHashRequest {
+        time_hash,
+        hashmap_size: hashmap_size as u32,
+    });
+    let _resp = client.set_done_hash(request).await?;
 
-    println!("RESPONSE={:?}", response);
-    print_statistics(1, "HashMap", hash_time, NUM_HASH, hashmap_size);
+    // print_statistics(1, "HashMap", hash_time, NUM_HASH, hashmap_size);
     Ok(())
 }
 
@@ -73,34 +73,4 @@ fn prep_data() -> (Vec<f64>, HashMap<String, String>, usize) {
         hashmap.insert(key, value);
     }
     (vector, hashmap, hashmap_size)
-}
-
-fn print_statistics(
-    num_clients: u8,
-    label: &str,
-    total_time: Duration,
-    total_count: usize,
-    avegare_size: usize,
-) {
-    let bytes_to_bits: f32 = 8.0;
-    let average_rtt = total_time / total_count as u32;
-    let throughput = bytes_to_bits * avegare_size as f32 / average_rtt.as_secs_f32();
-    eprintln!("================= {label} =================");
-    eprintln!("Total time|calls server: {total_time:?}|{total_count}");
-    eprintln!("Average roundtrip: {average_rtt:?}");
-    eprintln!("Average lat: {:?}", average_rtt / 2);
-    eprintln!("Average throughput: {:?} bps", throughput);
-
-    println!("NClients,Type,TotalCalls,Time,MicrosPerCall,Latency,Throughput");
-    let micros_in_sec = 1_000_000.0;
-    println!(
-        "{},{},{},{},{},{},{}",
-        num_clients,
-        label,
-        total_count,
-        total_time.as_secs_f32() * micros_in_sec,
-        average_rtt.as_secs_f32() * micros_in_sec,
-        average_rtt.as_secs_f32() * micros_in_sec / 2.0,
-        throughput
-    )
 }

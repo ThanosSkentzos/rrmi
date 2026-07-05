@@ -5,6 +5,10 @@ service Benchmark {
     rpc IncNum (NumRequest) returns (NumResponse);
     rpc SendVec (VecRequest) returns (VecResponse);
     rpc SendHashmap (HashRequest) returns (HashResponse);
+    rpc SetDoneNum (DoneNumRequest) returns (NullResponse);
+    rpc SetDoneVec (DoneVecRequest) returns (NullResponse);
+    rpc SetDoneHash (DoneHashRequest) returns (NullResponse);
+    rpc Barrier (NullResponse) returns (NullResponse);
 }
 
 message NumRequest {
@@ -18,12 +22,28 @@ message VecRequest {
    repeated double vector = 1;
 }
 
-message VecResponse {
+message VecResponse{
+}
+
+message HashResponse{
 }
 
 message HashRequest {
    map<string,string> hashmap = 1;
 }
 
-message HashResponse {
+message DoneNumRequest{
+    float time_num = 1;
+}
+
+message DoneVecRequest{
+    float time_vec = 1;
+}
+
+message DoneHashRequest{
+    float time_hash = 1;
+    uint32 hashmap_size = 2;
+}
+
+message NullResponse{
 }

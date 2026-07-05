@@ -1,6 +1,5 @@
 #!/bin/bash
 
-sequenceNumberCalls=100000
 reps=10
 
 rm -f out.* err.*
@@ -14,7 +13,7 @@ do
   for size in $(seq 2 11)
   do
     echo running size $size
-    srun -N $size run.sh $sequenceNumberCalls > out.$size 2> err.$size &
+    srun -N $size run.sh > out.$size 2> err.$size &
   done
   wait
 

@@ -1,11 +1,8 @@
 use std::collections::HashMap;
-use std::process::exit;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::{Barrier, Condvar};
-use std::thread::sleep;
 use std::time::Instant;
-use std::vec;
 use std::{
     sync::atomic::{AtomicBool, AtomicU32, AtomicU8},
     sync::Mutex,
@@ -13,16 +10,10 @@ use std::{
     time::Duration,
 };
 
+use crate::{REG_PORT, VEC_LEN};
 use rrmi::{create_registry, get_registry, remote::RemoteObject};
 use rrmi_macros::remote_object;
 use thousands::Separable;
-static HASHMAP_LEN: usize = 100_000;
-static VEC_LEN: usize = 500_000;
-static REG_PORT: u16 = 1099;
-// static NUM_NUMS: usize = 1000;
-static NUM_VECS: usize = 10;
-static NUM_HASH: usize = 10;
-static NUM_CLIENTS_LOCAL: u8 = 2;
 //=============================TRACING============================
 
 #[cfg(feature = "tracing")]
@@ -32,8 +23,6 @@ use tracing_chrome::ChromeLayerBuilder;
 #[cfg(feature = "tracing")]
 #[allow(unused)]
 use tracing_subscriber::{prelude::*, registry::Registry};
-
-use crate::utils::Utils;
 
 #[allow(unused)]
 #[cfg_attr(feature = "tracing", derive(Debug))]
@@ -219,125 +208,13 @@ impl NumberServer {
     }
 }
 
-#[cfg_attr(feature = "tracing", instrument)]
-fn prep_data() -> (Vec<f64>, HashMap<String, String>, usize) {
-    #[cfg(feature = "tracing")]
-    let span = span!(Level::TRACE, "vec");
-    #[cfg(feature = "tracing")]
-    let _enter = span.enter();
-    let vector: Vec<f64> = (0..VEC_LEN).map(|_| rand::random::<f64>()).collect();
-    #[cfg(feature = "tracing")]
-    drop(_enter);
-    #[cfg(feature = "tracing")]
-    let span = span!(Level::TRACE, "hashmap");
-    #[cfg(feature = "tracing")]
-    let _enter = span.enter();
-    let mut hashmap = HashMap::<String, String>::new();
-    let mut hashmap_size: usize = 0;
-    for i in 0..HASHMAP_LEN {
-        let value = format!("{:.10}f", rand::random::<f64>());
-        let key = format!("{i}");
-        hashmap_size += key.len() + value.len();
-        hashmap.insert(key, value);
-    }
-    #[cfg(feature = "tracing")]
-    drop(_enter);
-    (vector, hashmap, hashmap_size)
-}
-#[cfg_attr(feature = "tracing", instrument)]
-fn send_nums(stub: &NumberServerStub, times: usize) {
-    let start = Instant::now();
-    for _ in 0..times {
-        _ = stub.inc_num().unwrap();
-    }
-    let time = start.elapsed();
-    stub.set_done_num(time).unwrap();
-}
-
-#[cfg_attr(feature = "tracing", instrument)]
-fn send_vecs(stub: &NumberServerStub, times: usize, vector: &Vec<f64>) {
-    let start = Instant::now();
-    for _ in 0..times {
-        _ = stub.send_large_vec(vector.clone()).unwrap();
-    }
-    let time = start.elapsed();
-    _ = stub.set_done_arr(time);
-}
-
-#[cfg_attr(feature = "tracing", instrument)]
-fn send_hashmaps(
-    stub: &NumberServerStub,
-    times: usize,
-    hashmap: &HashMap<String, String>,
-    hashmap_size: usize,
+pub fn server(
+    experiment: fn(u8, usize, usize, usize),
+    num_clients: u8,
+    num_nums: usize,
+    num_vecs: usize,
+    num_hash: usize,
 ) {
-    let start = Instant::now();
-    for _ in 0..times {
-        _ = stub.send_hashmap(hashmap.clone());
-    }
-    let time = start.elapsed();
-    _ = stub.set_done_hash(time, hashmap_size);
-}
-#[cfg_attr(feature = "tracing", instrument)]
-fn client(host: &str, nums: usize, vecs: usize, hashmaps: usize) {
-    let reg = get_registry(host, REG_PORT);
-    let stub: NumberServerStub = reg
-        .lookup("NumberServer")
-        .expect("stub lookup failed")
-        .into();
-    let (vector, hashmap, hashmap_size) = prep_data();
-    let _ = stub.barrier_mutex();
-    send_nums(&stub, nums);
-
-    let _ = stub.barrier_mutex();
-    send_vecs(&stub, vecs, &vector);
-
-    let _ = stub.barrier_mutex();
-    send_hashmaps(&stub, hashmaps, &hashmap, hashmap_size);
-}
-
-#[cfg_attr(feature = "tracing", instrument)]
-fn run_clients_local(num_clients: u8, num_calls: usize) {
-    let mut handles = vec![];
-    for i in 0..num_clients {
-        let handle = thread::Builder::new()
-            .name(format!("Stub{i}"))
-            .spawn(move || {
-                client("localhost", num_calls, NUM_VECS, NUM_HASH);
-            })
-            .expect("Could not spawn thread.");
-        handles.push(handle);
-    }
-    for handle in handles {
-        handle.join().expect("Could not join handle");
-    }
-}
-
-#[cfg_attr(feature = "tracing", instrument)]
-fn run_clients_remote(num_clients: u8, num_calls: usize) {
-    eprintln!("waiting for {num_clients} clients to finish {num_calls} of inc_num, {NUM_VECS} of send_large_vec and {NUM_HASH} send_hashmap");
-    let reg = get_registry("localhost", REG_PORT);
-    let stub: NumberServerStub = reg
-        .lookup("NumberServer")
-        .expect("stub lookup failed")
-        .into();
-    let mut done = false;
-    let mut prev: usize;
-    let mut num_done: usize = 0;
-    while !done {
-        prev = num_done;
-        num_done = stub.get_clients_done().unwrap();
-        if prev != num_done {
-            eprintln!("Done clients increased to {num_done}")
-        }
-        if num_done == 3 * num_clients as usize {
-            done = true;
-        }
-        sleep(Duration::from_millis(10));
-    }
-}
-
-pub fn server(experiment: fn(u8, usize), num_clients: u8, num_calls: usize) {
     // CREATE REGISTRY
     let port = REG_PORT;
     eprintln!("Creating Registry");
@@ -350,8 +227,8 @@ pub fn server(experiment: fn(u8, usize), num_clients: u8, num_calls: usize) {
 
     // RUN EXPERIMENT
     let t = Instant::now();
-    eprintln!("Running experiment with {num_clients} clients and {num_calls} numbers sent");
-    experiment(num_clients, num_calls);
+    eprintln!("Running experiment with {num_clients} clients and {num_nums} numbers sent");
+    experiment(num_clients, num_nums, num_vecs, num_hash);
     let time = t.elapsed();
 
     // FINAL NUMBER
@@ -379,16 +256,16 @@ pub fn server(experiment: fn(u8, usize), num_clients: u8, num_calls: usize) {
 
     let num_time = num_server.get_num_info();
     let num_size = size_of_val(&final_num);
-    let num_count = num_clients as usize * num_calls;
+    let num_count = num_clients as usize * num_nums;
     print_statistics(num_clients, "Sequence", num_time, num_count, num_size);
 
     let vecs_time = num_server.get_arr_info();
     let vec_size = size_of::<f64>() * VEC_LEN;
-    let vec_count = num_clients as usize * NUM_VECS;
+    let vec_count = num_clients as usize * num_vecs;
     print_statistics(num_clients, "Vector", vecs_time, vec_count, vec_size);
 
     let (hash_time, hashmaps_size) = num_server.get_hashmap_info();
-    let hash_count = num_clients as usize * NUM_HASH;
+    let hash_count = num_clients as usize * num_hash;
     let hash_avg_size = hashmaps_size / hash_count;
     print_statistics(num_clients, "Hashmap", hash_time, hash_count, hash_avg_size);
 }
@@ -421,50 +298,4 @@ fn print_statistics(
         average_rtt.as_secs_f32() * micros_in_sec / 2.0,
         throughput
     )
-}
-pub fn run_local(num_calls: usize) {
-    server(run_clients_local, NUM_CLIENTS_LOCAL, num_calls);
-}
-pub fn run_remote_liacs(num_calls: usize) {
-    let util = Utils::new();
-    eprintln!("{util:?}");
-
-    if util.liacs_nodes.len() < 2 {
-        eprintln!("This application needs to be executed on at least 2 machines.\nexiting...");
-        exit(1);
-    }
-
-    if util.am_i_liacs_coordinator() {
-        server(
-            run_clients_remote,
-            (util.liacs_nodes.len() - 1) as u8,
-            num_calls,
-        );
-    } else {
-        let server_hostname = util.liacs_coordinator;
-        sleep(Duration::from_secs(1));
-        client(&server_hostname, num_calls, NUM_VECS, NUM_HASH);
-    }
-}
-
-pub fn run_remote_das(num_calls: usize) {
-    let util = Utils::new();
-    eprintln!("{util:?}");
-
-    if util.slurm_nodes.len() < 2 {
-        eprintln!("This application needs to be executed on at least 2 machines.\nexiting...");
-        exit(1);
-    }
-
-    if util.am_i_slurm_coordinator() {
-        server(
-            run_clients_remote,
-            (util.slurm_nodes.len() - 1) as u8,
-            num_calls,
-        );
-    } else {
-        let server_hostname = util.slurm_coordinator;
-        sleep(Duration::from_secs(1));
-        client(&server_hostname, num_calls, NUM_VECS, NUM_HASH);
-    }
 }

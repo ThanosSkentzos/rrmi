@@ -1,3 +1,3 @@
 [workspace]
-members = ["rrmi", "rrmi_macros", "example"]
+members = ["rrmi", "rrmi_macros", "example","grpc_example"]
 resolver = "2"

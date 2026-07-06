@@ -1,5 +1,9 @@
+use std::thread::sleep;
+use std::{process::exit, time::Duration};
+
 use clap::{Parser, ValueEnum};
-use grpc_example::{client::run_client, server::run_server, NUM_CLIENTS_LOCAL};
+use grpc_example::utils::get_ib_hostname;
+use grpc_example::{client::run_client, server::run_server, utils::Utils, NUM_CLIENTS_LOCAL};
 use tokio::task::JoinSet;
 
 #[derive(ValueEnum, Clone, Debug)]
@@ -24,7 +28,7 @@ async fn main() {
         }
         false => {
             eprintln!("RUNNING REMOTE");
-            run_remote();
+            run_remote().await;
         }
     }
 }
@@ -33,7 +37,7 @@ async fn run_local() {
     let _sever_handle = tokio::spawn(async { run_server(NUM_CLIENTS_LOCAL).await });
     let mut set = JoinSet::new();
     for _ in 0..NUM_CLIENTS_LOCAL {
-        set.spawn(async { run_client().await });
+        set.spawn(async { run_client("http://localhost").await });
     }
     // _ = run_server(NUM_CLIENTS_LOCAL).await;
 
@@ -50,6 +54,24 @@ async fn run_local() {
     _ = _sever_handle.await;
 }
 
-fn run_remote() {
-    todo!()
+async fn run_remote() {
+    let util = Utils::new();
+    eprintln!("{util:?}");
+
+    if util.slurm_nodes.len() < 2 {
+        eprintln!("This application needs to be executed on at least 2 machines.\nexiting...");
+        exit(1);
+    }
+
+    let num_clients: u8 = util.slurm_nodes.len() as u8 - 1;
+    let hostname = &util.slurm_coordinator.to_string();
+    #[cfg(feature = "infiniband")]
+    let hostname = get_ib_hostname(&hostname);
+    let hostname = format!("http://{}", hostname);
+    if util.am_i_slurm_coordinator() {
+        _ = run_server(num_clients).await;
+    } else {
+        sleep(Duration::from_secs(1));
+        _ = run_client(&hostname).await;
+    }
 }

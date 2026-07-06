@@ -16,15 +16,5 @@ tonic-prost = "0.14.6"
 [build-dependencies]
 tonic-prost-build = "*"
 
-# tracing = { version = "0.1.44", optional = true }
-# tracing-chrome = { version = "0.7.2", optional = true }
-# tracing-subscriber = { version = "0.3.23", optional = true }
-
-# [features]
-# infiniband = []
-# tracing = [
-#     "dep:tracing",
-#     "dep:tracing-chrome",
-#     "dep:tracing-subscriber",
-#     "rrmi/tracing",
-# ]
+[features]
+infiniband = []

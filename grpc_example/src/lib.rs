@@ -12,3 +12,4 @@ pub static VEC_LEN: usize = 500_000;
 
 pub mod client;
 pub mod server;
+pub mod utils;

@@ -5,15 +5,18 @@ use crate::experiment::benchmark_client::BenchmarkClient;
 use crate::experiment::{
     DoneHashRequest, DoneNumRequest, DoneVecRequest, NullResponse, NumRequest, VecRequest,
 };
-use crate::{HASHMAP_LEN, NUM_HASH, NUM_NUMS, NUM_VECS, VEC_LEN};
+use crate::utils::get_my_hostname;
+use crate::{HASHMAP_LEN, NUM_NUMS, VEC_LEN};
 
 use tonic::transport::Endpoint;
 use tonic::Request;
 
 use crate::experiment::HashRequest;
 
-pub async fn run_client() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let endpoint = Endpoint::from_static("http://[::1]:50051").tcp_nodelay(true);
+pub async fn run_client(hostname: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let url = format!("{hostname}:50051");
+    eprintln!("{} starting client -> {url}", get_my_hostname());
+    let endpoint = Endpoint::from_shared(url).unwrap().tcp_nodelay(true);
     let mut client = BenchmarkClient::connect(endpoint).await?;
 
     let (vector, hashmap, hashmap_size) = prep_data();

@@ -12,6 +12,7 @@ use crate::experiment::{
     DoneHashRequest, DoneNumRequest, DoneVecRequest, HashRequest, HashResponse, NullResponse,
     NumRequest, NumResponse, VecRequest, VecResponse,
 };
+use crate::utils::get_my_hostname;
 use crate::{NUM_HASH, NUM_NUMS, NUM_VECS, VEC_LEN};
 
 #[derive(Debug)]
@@ -216,7 +217,8 @@ fn print_statistics(
 }
 
 pub async fn run_server(num_clients: u8) -> Result<(), Box<dyn std::error::Error + Sync + Send>> {
-    let addr = "[::1]:50051".parse()?;
+    eprintln!("{} starting server",get_my_hostname());
+    let addr = "[::]:50051".parse()?;
     let server = NumberServer::new(num_clients);
     let shutdown = server.shutdown.clone();
     Server::builder()

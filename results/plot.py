@@ -5,10 +5,12 @@ import os
 
 os.makedirs("plots",exist_ok=True)
 # print("Reading data")
-eth_rust = pd.read_csv("results_rust.csv", index_col=False)
-eth_java = pd.read_csv("results_java.csv", index_col=False)
-ib_rust = pd.read_csv("results_rust_ib.csv", index_col=False)
-ib_java = pd.read_csv("results_java_ib.csv", index_col=False)
+eth_rust = pd.read_csv("results/results_rust.csv", index_col=False)
+eth_rust_grpc = pd.read_csv("results/results_rust_grpc.csv", index_col=False)
+eth_java = pd.read_csv("results/results_java.csv", index_col=False)
+ib_rust = pd.read_csv("results/results_rust_ib.csv", index_col=False)
+ib_java = pd.read_csv("results/results_java_ib.csv", index_col=False)
+ib_rust_grpc = pd.read_csv("results/results_rust_grpc_ib.csv", index_col=False)
 
 # df.columns = [
 #     "Number of Clients",
@@ -33,6 +35,9 @@ cols = ["NClients","Latency","Throughput"]
 
 fig_lat, ax_lat = plt.subplots(figsize=(12, 8))
 fig_thr, ax_thr = plt.subplots(figsize=(12, 8))
+fig_lat_ib, ax_lat_ib = plt.subplots(figsize=(12, 8))
+fig_thr_ib, ax_thr_ib = plt.subplots(figsize=(12, 8))
+
 b = "#378ADD"
 c = "#37C4DD"
 o = "#D87930"
@@ -43,6 +48,7 @@ pu = "#7E21A3"
 pi = "#A321A3"
 
 eth_ax = [ax_lat,ax_thr]
+ib_ax = [ax_lat_ib,ax_thr_ib]
 alpha=0.2
 
 type_keys = ["Sequence","Vector","Hashmap"]
@@ -72,23 +78,33 @@ def plot(df,cols,ax,color,linestyles,markers,text):
             a.fill_between(num_clients,m-s,m+s,alpha=alpha,color=color)
 
             a.set_xlabel('Number of Clients')
-            # a.legend(title="Experiment and framework")
-            a.legend(title = "This work                        Java RMI",ncol=2,shadow=True)
+            a.legend(
+                title = "This work"+" "*25+"Java RMI"+" "*35+"gRPC"+" "*10,
+                ncol=3,shadow=True, bbox_to_anchor = (0.11,0.12,0.5,0.55))
             a.grid(True, alpha=0.3)
             a.set_yscale("log")
 
 plot(eth_rust,cols,eth_ax,o,linestyles,markers,"")
-plot(ib_rust,cols,eth_ax,y,linestyles,markers,ib_text)
 plot(eth_java,cols,eth_ax,b,linestyles,markers,"")
-plot(ib_java,cols,eth_ax,c,linestyles,markers,ib_text)
+plot(eth_rust_grpc,cols,eth_ax,g,linestyles,markers," rust gRPC")
+
+plot(ib_rust,cols,ib_ax,o,linestyles,markers,ib_text)
+plot(ib_java,cols,ib_ax,b,linestyles,markers,ib_text)
+plot(ib_rust_grpc,cols,ib_ax,g,linestyles,markers," rust gRPC"+ib_text)
 
 ax_lat.set_ylabel('Average Latency (μsec)')
-ax_lat.set_title('Average Latency vs Number of Clients')
+ax_lat.set_title('Average Latency vs Number of Clients - Using Ethernet')
+ax_lat_ib.set_ylabel('Average Latency (μsec)')
+ax_lat_ib.set_title('Average Latency vs Number of Clients - Using Infiniband')
 
 ax_thr.set_ylabel('Average Throughput (bps)')
-ax_thr.set_title('Average Throughput vs Number of Clients')
+ax_thr.set_title('Average Throughput vs Number of Clients - Using Ethernet')
+ax_thr_ib.set_ylabel('Average Throughput (bps)')
+ax_thr_ib.set_title('Average Throughput vs Number of Clients - Using Infiniband')
 
-fig_lat.savefig("latency.png")
-fig_thr.savefig("throughput.png")
+fig_lat.savefig("plots/latency.png")
+fig_thr.savefig("plots/throughput.png")
+fig_lat_ib.savefig("plots/latency_ib.png")
+fig_thr_ib.savefig("plots/throughput_ib.png")
 
 # %%

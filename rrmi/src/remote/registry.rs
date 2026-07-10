@@ -185,7 +185,6 @@ impl Registry {
 /// // create registry
 /// use rrmi::{get_registry,create_registry};
 /// let port: u16 = 1099;
-/// let local = "localhost";
 /// let reg = create_registry(port);
 /// // check that is has the right port
 /// assert_eq!(port,reg.port);

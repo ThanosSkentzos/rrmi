@@ -2,8 +2,11 @@ use std::thread::sleep;
 use std::{process::exit, time::Duration};
 
 use clap::{Parser, ValueEnum};
+
+#[cfg(feature = "infiniband")]
 use grpc_example::utils::get_ib_hostname;
 use grpc_example::{client::run_client, server::run_server, utils::Utils, NUM_CLIENTS_LOCAL};
+use grpc_example::{NUM_HASH, NUM_NUMS, NUM_VECS};
 use tokio::task::JoinSet;
 
 #[derive(ValueEnum, Clone, Debug)]
@@ -16,28 +19,42 @@ enum Local {
 struct MyArgs {
     #[arg(long)]
     local: bool,
+
+    #[arg(long, default_value_t = NUM_NUMS)]
+    num_nums: usize,
+
+    #[arg(long, default_value_t = NUM_VECS)]
+    num_vecs: usize,
+
+    #[arg(long, default_value_t = NUM_HASH)]
+    num_hash: usize,
 }
 
 #[tokio::main]
 async fn main() {
     let args = MyArgs::parse();
+    let num_nums = args.num_nums;
+    let num_vecs = args.num_vecs;
+    let num_hash = args.num_hash;
     match args.local {
         true => {
             eprintln!("RUNNING LOCAL");
-            run_local().await;
+            run_local(num_nums, num_vecs, num_hash).await;
         }
         false => {
             eprintln!("RUNNING REMOTE");
-            run_remote().await;
+            run_remote(num_nums, num_vecs, num_hash).await;
         }
     }
 }
 
-async fn run_local() {
-    let _sever_handle = tokio::spawn(async { run_server(NUM_CLIENTS_LOCAL).await });
+async fn run_local(num_nums: usize, num_vecs: usize, num_hash: usize) {
+    let _sever_handle = tokio::spawn(async move { run_server(NUM_CLIENTS_LOCAL).await });
     let mut set = JoinSet::new();
     for _ in 0..NUM_CLIENTS_LOCAL {
-        set.spawn(async { run_client("http://localhost").await });
+        set.spawn(
+            async move { run_client("http://localhost", num_nums, num_vecs, num_hash).await },
+        );
     }
     // _ = run_server(NUM_CLIENTS_LOCAL).await;
 
@@ -54,7 +71,7 @@ async fn run_local() {
     _ = _sever_handle.await;
 }
 
-async fn run_remote() {
+async fn run_remote(num_nums: usize, num_vecs: usize, num_hash: usize) {
     let util = Utils::new();
     eprintln!("{util:?}");
 
@@ -72,6 +89,6 @@ async fn run_remote() {
         _ = run_server(num_clients).await;
     } else {
         sleep(Duration::from_secs(1));
-        _ = run_client(&hostname).await;
+        _ = run_client(&hostname, num_nums, num_vecs, num_hash).await;
     }
 }

@@ -86,18 +86,18 @@ impl NumberServer {
 
     #[remote]
     #[cfg_attr(feature = "tracing", instrument)]
-    fn send_large_vec(&self, data: Vec<f64>) -> () {
-        eprintln!(
-            "Received large vector of size: {}x{}B",
-            data.len(),
-            size_of::<f64>()
-        )
+    fn send_large_vec(&self, _data: Vec<f64>) -> () {
+        // eprintln!(
+        //     "Received large vector of size: {}x{}B",
+        //     _data.len(),
+        //     size_of::<f64>()
+        // )
     }
 
     #[remote]
     #[cfg_attr(feature = "tracing", instrument)]
-    fn send_hashmap(&self, data: HashMap<String, String>) -> () {
-        eprintln!("Received hashmap with {} elements", data.len())
+    fn send_hashmap(&self, _data: HashMap<String, String>) -> () {
+        // eprintln!("Received hashmap with {} elements", _data.len())
     }
 
     #[remote]

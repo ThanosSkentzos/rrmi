@@ -46,6 +46,12 @@ fn prep_data() -> (Vec<f64>, HashMap<String, String>, usize) {
 }
 #[cfg_attr(feature = "tracing", instrument)]
 fn send_nums(stub: &NumberServerStub, times: usize) {
+    // Warmup
+    let _ = stub.barrier_mutex();
+    for _ in 0..100{
+        _ = stub.inc_num().unwrap();
+    }
+    let _ = stub.barrier_mutex();
     let start = Instant::now();
     for _ in 0..times {
         _ = stub.inc_num().unwrap();
@@ -86,7 +92,6 @@ pub fn client(host: &str, nums: usize, vecs: usize, hashmaps: usize) {
         .expect("stub lookup failed")
         .into();
     let (vector, hashmap, hashmap_size) = prep_data();
-    let _ = stub.barrier_mutex();
     send_nums(&stub, nums);
 
     let _ = stub.barrier_mutex();

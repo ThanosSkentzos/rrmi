@@ -32,6 +32,15 @@ struct MyArgs {
 
     #[arg(long)]
     liacs: bool,
+
+    #[arg(long, default_value_t = NUM_NUMS)]
+    num_nums: usize,
+
+    #[arg(long, default_value_t = NUM_VECS)]
+    num_vecs: usize,
+
+    #[arg(long, default_value_t = NUM_HASH)]
+    num_hash: usize,
 }
 fn main() {
     #[cfg(feature = "tracing")]
@@ -41,32 +50,36 @@ fn main() {
 
     let args = MyArgs::parse();
     eprintln!("{args:?}");
+    let num_nums = args.num_nums;
+    let num_vecs = args.num_vecs;
+    let num_hash = args.num_hash;
+
     match args.local {
         true => {
             eprintln!("RUNNING LOCAL");
-            run_local();
+            run_local(num_nums, num_vecs, num_hash);
         }
         false => {
             eprintln!("RUNNING REMOTE");
             match args.liacs {
-                false => run_remote_das(),
-                true => run_remote_liacs(),
+                false => run_remote_das(num_nums, num_vecs, num_hash),
+                true => run_remote_liacs(num_nums, num_vecs, num_hash),
             }
         }
     }
 }
 
-pub fn run_local() {
+pub fn run_local(num_nums: usize, num_vecs: usize, num_hash: usize) {
     server(
         run_clients_local,
         NUM_CLIENTS_LOCAL,
-        NUM_NUMS,
-        NUM_VECS,
-        NUM_HASH,
+        num_nums,
+        num_vecs,
+        num_hash,
     );
 }
 
-pub fn run_remote_liacs() {
+pub fn run_remote_liacs(num_nums: usize, num_vecs: usize, num_hash: usize) {
     let util = Utils::new();
     eprintln!("{util:?}");
 
@@ -79,9 +92,9 @@ pub fn run_remote_liacs() {
         server(
             run_clients_remote,
             (util.liacs_nodes.len() - 1) as u8,
-            NUM_NUMS,
-            NUM_VECS,
-            NUM_HASH,
+            num_nums,
+            num_vecs,
+            num_hash,
         );
     } else {
         let server_hostname = util.liacs_coordinator;
@@ -90,7 +103,7 @@ pub fn run_remote_liacs() {
     }
 }
 
-pub fn run_remote_das() {
+pub fn run_remote_das(num_nums: usize, num_vecs: usize, num_hash: usize) {
     let util = Utils::new();
     eprintln!("{util:?}");
 
@@ -103,13 +116,13 @@ pub fn run_remote_das() {
         server(
             run_clients_remote,
             (util.slurm_nodes.len() - 1) as u8,
-            NUM_NUMS,
-            NUM_VECS,
-            NUM_HASH,
+            num_nums,
+            num_vecs,
+            num_hash,
         );
     } else {
         let server_hostname = util.slurm_coordinator;
         sleep(Duration::from_secs(1));
-        client(&server_hostname, NUM_NUMS, NUM_VECS, NUM_HASH);
+        client(&server_hostname, num_nums, num_vecs, num_hash);
     }
 }

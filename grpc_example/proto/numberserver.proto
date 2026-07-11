@@ -43,6 +43,9 @@ message DoneVecRequest{
 message DoneHashRequest{
     float time_hash = 1;
     uint32 hashmap_size = 2;
+    uint32 num_nums = 3;
+    uint32 num_vecs = 4;
+    uint32 num_hash = 5;
 }
 
 message NullResponse{

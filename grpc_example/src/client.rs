@@ -6,14 +6,19 @@ use crate::experiment::{
     DoneHashRequest, DoneNumRequest, DoneVecRequest, NullResponse, NumRequest, VecRequest,
 };
 use crate::utils::get_my_hostname;
-use crate::{HASHMAP_LEN, NUM_NUMS, VEC_LEN};
+use crate::{HASHMAP_LEN, VEC_LEN};
 
 use tonic::transport::Endpoint;
 use tonic::Request;
 
 use crate::experiment::HashRequest;
 
-pub async fn run_client(hostname: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+pub async fn run_client(
+    hostname: &str,
+    num_nums: usize,
+    num_vecs: usize,
+    num_hash: usize,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let url = format!("{hostname}:50051");
     eprintln!("{} starting client -> {url}", get_my_hostname());
     let endpoint = Endpoint::from_shared(url).unwrap().tcp_nodelay(true);
@@ -22,7 +27,7 @@ pub async fn run_client(hostname: &str) -> Result<(), Box<dyn std::error::Error 
     let (vector, hashmap, hashmap_size) = prep_data();
     let num_start = Instant::now();
 
-    for _ in 0..NUM_NUMS {
+    for _ in 0..num_nums {
         let request = Request::new(NumRequest {});
         let _response = client.inc_num(request).await?;
     }
@@ -37,9 +42,13 @@ pub async fn run_client(hostname: &str) -> Result<(), Box<dyn std::error::Error 
     // print_statistics(1, "Sequence", time, NUM_NUMS, size_of_val(&final_num));
 
     // VECTOR
-    let request = Request::new(VecRequest { vector });
     let vec_start = Instant::now();
-    let _response = client.send_vec(request).await?;
+    for _ in 0..num_vecs {
+        let request = Request::new(VecRequest {
+            vector: vector.clone(),
+        });
+        let _response = client.send_vec(request).await?;
+    }
     eprintln!("{_response:?}");
     let time_vec = vec_start.elapsed().as_secs_f32();
     let request = Request::new(DoneVecRequest { time_vec });
@@ -50,14 +59,21 @@ pub async fn run_client(hostname: &str) -> Result<(), Box<dyn std::error::Error 
     // print_statistics(1, "Vector", vec_time, NUM_VECS, size_of::<f64>() * VEC_LEN);
 
     // HASHMAP
-    let request = Request::new(HashRequest { hashmap });
     let hash_start = Instant::now();
-    let _response = client.send_hashmap(request).await?;
+    for _ in 0..num_hash {
+        let request = Request::new(HashRequest {
+            hashmap: hashmap.clone(),
+        });
+        let _response = client.send_hashmap(request).await?;
+    }
     eprintln!("{_response:?}");
     let time_hash = hash_start.elapsed().as_secs_f32();
     let request = Request::new(DoneHashRequest {
         time_hash,
         hashmap_size: hashmap_size as u32,
+        num_nums: num_nums as u32,
+        num_vecs: num_vecs as u32,
+        num_hash: num_hash as u32
     });
     let _resp = client.set_done_hash(request).await?;
 

@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 
+// use rrmi::receive_bytes;
 #[cfg(feature = "bench_tcp")]
 use rrmi::{
     _send_data_combined, _send_data_ioslice, _send_data_separate, _send_data_separate_flush,
@@ -118,7 +119,7 @@ fn bench_recv(c: &mut Criterion) {
 
     group.bench_function(BenchmarkId::new("stream", size), |b| {
         b.iter(|| {
-            let _ = receive_data(&mut stream_v1);
+            let _ = receive_bytes(&mut stream_v1);
         })
     });
     group.finish();

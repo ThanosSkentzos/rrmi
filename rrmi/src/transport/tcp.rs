@@ -24,7 +24,7 @@ pub fn send_bytes(data_serial: Vec<u8>, stream: &mut TcpStream) -> RMIResult<()>
 }
 
 pub fn _send_data_separate(data_serial: Vec<u8>, stream: &mut TcpStream) -> RMIResult<()> {
-    let len = data_serial.len().to_be_bytes();
+    let len: [u8;8] = data_serial.len().to_be_bytes();
     let _ = stream.write_all(&len).map_err(|e| {
         eprintln!("write len failed {e}");
         RMIError::TransportError(e.to_string())
@@ -37,7 +37,7 @@ pub fn _send_data_separate(data_serial: Vec<u8>, stream: &mut TcpStream) -> RMIR
 }
 
 pub fn _send_data_separate_flush(data_serial: Vec<u8>, stream: &mut TcpStream) -> RMIResult<()> {
-    let len = data_serial.len().to_be_bytes();
+    let len: [u8; 8] = data_serial.len().to_be_bytes();
     let _ = stream.write_all(&len).map_err(|e| {
         eprintln!("write len failed {e}");
         RMIError::TransportError(e.to_string())
@@ -54,7 +54,7 @@ pub fn _send_data_separate_flush(data_serial: Vec<u8>, stream: &mut TcpStream) -
     Ok(())
 }
 pub fn _send_data_combined(data_serial: Vec<u8>, stream: &mut TcpStream) -> RMIResult<()> {
-    let len = (data_serial.len() as u32).to_be_bytes();
+    let len: [u8; 8] = (data_serial.len() as u64).to_be_bytes();
     let mut buf = Vec::with_capacity(4 + data_serial.len());
     buf.extend_from_slice(&len);
     buf.extend_from_slice(&data_serial);
@@ -65,7 +65,7 @@ pub fn _send_data_combined(data_serial: Vec<u8>, stream: &mut TcpStream) -> RMIR
 }
 pub fn _send_data_ioslice(data_serial: Vec<u8>, stream: &mut TcpStream) -> RMIResult<()> {
     //TODO: find a way of sending just the data, not the size first
-    let len = (data_serial.len() as u32).to_be_bytes();
+    let len: [u8; 8] = (data_serial.len() as u64).to_be_bytes();
 
     let bufs = &[IoSlice::new(&len), IoSlice::new(&data_serial)];
     let _ = stream
@@ -76,14 +76,14 @@ pub fn _send_data_ioslice(data_serial: Vec<u8>, stream: &mut TcpStream) -> RMIRe
 
 #[cfg_attr(feature = "tracing", instrument)]
 pub fn receive_bytes(stream: &mut TcpStream) -> RMIResult<Vec<u8>> {
-    let mut len = [0u8; 4];
+    let mut len: [u8; 8] = [0u8; 8];
     stream.read_exact(&mut len).map_err(|e| match e.kind() {
         ErrorKind::UnexpectedEof => RMIError::TransportError("connection closed".into()),
         _ => RMIError::TransportError(e.to_string()),
     })?;
-    let response_len = u32::from_be_bytes(len) as usize;
+    let response_len = u64::from_be_bytes(len);
 
-    const MAX_SIZE: usize = 16 * 1024 * 1024;
+    const MAX_SIZE: u64 = 2_u64.pow(36);
     if response_len > MAX_SIZE {
         return Err(RMIError::TransportError(format!(
             "message with len {} exceeded maximum size of {}",
@@ -93,7 +93,7 @@ pub fn receive_bytes(stream: &mut TcpStream) -> RMIResult<Vec<u8>> {
 
     // eprintln!("tcp reading response {response_len:?} bytes...");
     //TODO how can I avoid reallocation here
-    let mut bytes = vec![0u8; response_len];
+    let mut bytes = vec![0u8; response_len as usize];
     stream.read_exact(&mut bytes).map_err(|e| match e.kind() {
         ErrorKind::UnexpectedEof => RMIError::TransportError("connection closed".into()),
         _ => RMIError::TransportError(e.to_string()),

@@ -80,17 +80,20 @@ def plot(df,cols,ax,color,linestyles,markers,text):
             a.set_xlabel('Number of Clients')
             a.legend(
                 title = "This work"+" "*25+"Java RMI"+" "*35+"gRPC"+" "*10,
-                ncol=3,shadow=True, bbox_to_anchor = (0.11,0.12,0.5,0.55))
+                ncol=3,shadow=True, 
+                bbox_to_anchor = (0.1,0.12,0.4,.47),
+                loc="center left"
+                )
             a.grid(True, alpha=0.3)
             a.set_yscale("log")
 
 plot(eth_rust,cols,eth_ax,o,linestyles,markers,"")
 plot(eth_java,cols,eth_ax,b,linestyles,markers,"")
-plot(eth_rust_grpc,cols,eth_ax,g,linestyles,markers," rust gRPC")
+plot(eth_rust_grpc,cols,eth_ax,g,linestyles,markers)
 
-plot(ib_rust,cols,ib_ax,o,linestyles,markers,ib_text)
-plot(ib_java,cols,ib_ax,b,linestyles,markers,ib_text)
-plot(ib_rust_grpc,cols,ib_ax,g,linestyles,markers," rust gRPC"+ib_text)
+plot(ib_rust,cols,ib_ax,o,linestyles,markers,"")
+plot(ib_java,cols,ib_ax,b,linestyles,markers,"")
+plot(ib_rust_grpc,cols,ib_ax,g,linestyles,markers,"")
 
 ax_lat.set_ylabel('Average Latency (μsec)')
 ax_lat.set_title('Average Latency vs Number of Clients - Using Ethernet')

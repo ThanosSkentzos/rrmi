@@ -1,9 +1,9 @@
-use clap::{Parser, ValueEnum};
+use clap::Parser;
 use example::{
     client::{client, run_clients_local, run_clients_remote},
     server::server,
     utils::Utils,
-    NUM_CLIENTS_LOCAL, NUM_HASH, NUM_NUMS, NUM_VECS,
+    Config, NUM_CLIENTS_LOCAL,
 };
 use std::{process::exit, thread::sleep, time::Duration};
 
@@ -13,73 +13,35 @@ use tracing_chrome::ChromeLayerBuilder;
 #[allow(unused)]
 use tracing_subscriber::{prelude::*, registry::Registry};
 
-#[derive(ValueEnum, Clone, Debug)]
-enum Local {
-    False,
-    True,
-}
-
-#[derive(ValueEnum, Clone, Debug)]
-enum Liacs {
-    False,
-    True,
-}
-
-#[derive(Parser, Debug)]
-struct MyArgs {
-    #[arg(long)]
-    local: bool,
-
-    #[arg(long)]
-    liacs: bool,
-
-    #[arg(long, default_value_t = NUM_NUMS)]
-    num_nums: usize,
-
-    #[arg(long, default_value_t = NUM_VECS)]
-    num_vecs: usize,
-
-    #[arg(long, default_value_t = NUM_HASH)]
-    num_hash: usize,
-}
 fn main() {
     #[cfg(feature = "tracing")]
     let (chrome_layer, _guard) = ChromeLayerBuilder::new().build();
     #[cfg(feature = "tracing")]
     tracing_subscriber::registry().with(chrome_layer).init();
 
-    let args = MyArgs::parse();
-    eprintln!("{args:?}");
-    let num_nums = args.num_nums;
-    let num_vecs = args.num_vecs;
-    let num_hash = args.num_hash;
+    let config = Config::parse();
+    eprintln!("{config:?}");
 
-    match args.local {
+    match config.local {
         true => {
             eprintln!("RUNNING LOCAL");
-            run_local(num_nums, num_vecs, num_hash);
+            run_local(config);
         }
         false => {
             eprintln!("RUNNING REMOTE");
-            match args.liacs {
-                false => run_remote_das(num_nums, num_vecs, num_hash),
-                true => run_remote_liacs(num_nums, num_vecs, num_hash),
+            match config.liacs {
+                false => run_remote_das(config),
+                true => run_remote_liacs(config),
             }
         }
     }
 }
 
-pub fn run_local(num_nums: usize, num_vecs: usize, num_hash: usize) {
-    server(
-        run_clients_local,
-        NUM_CLIENTS_LOCAL,
-        num_nums,
-        num_vecs,
-        num_hash,
-    );
+pub fn run_local(config: Config) {
+    server(run_clients_local, NUM_CLIENTS_LOCAL, config);
 }
 
-pub fn run_remote_liacs(num_nums: usize, num_vecs: usize, num_hash: usize) {
+pub fn run_remote_liacs(config: Config) {
     let util = Utils::new();
     eprintln!("{util:?}");
 
@@ -92,18 +54,16 @@ pub fn run_remote_liacs(num_nums: usize, num_vecs: usize, num_hash: usize) {
         server(
             run_clients_remote,
             (util.liacs_nodes.len() - 1) as u8,
-            num_nums,
-            num_vecs,
-            num_hash,
+            config,
         );
     } else {
         let server_hostname = util.liacs_coordinator;
         sleep(Duration::from_secs(1));
-        client(&server_hostname, NUM_NUMS, NUM_VECS, NUM_HASH);
+        client(&server_hostname, config);
     }
 }
 
-pub fn run_remote_das(num_nums: usize, num_vecs: usize, num_hash: usize) {
+pub fn run_remote_das(config: Config) {
     let util = Utils::new();
     eprintln!("{util:?}");
 
@@ -116,13 +76,11 @@ pub fn run_remote_das(num_nums: usize, num_vecs: usize, num_hash: usize) {
         server(
             run_clients_remote,
             (util.slurm_nodes.len() - 1) as u8,
-            num_nums,
-            num_vecs,
-            num_hash,
+            config,
         );
     } else {
         let server_hostname = util.slurm_coordinator;
         sleep(Duration::from_secs(1));
-        client(&server_hostname, num_nums, num_vecs, num_hash);
+        client(&server_hostname, config);
     }
 }

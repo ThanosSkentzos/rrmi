@@ -194,28 +194,29 @@ fn print_statistics(
     label: &str,
     total_time: Duration,
     total_count: usize,
-    avegare_size: usize,
+    average_size: usize,
 ) {
     let bytes_to_bits: f32 = 8.0;
     let average_rtt = total_time / total_count as u32;
-    let throughput = bytes_to_bits * avegare_size as f32 / average_rtt.as_secs_f32();
+    let throughput = bytes_to_bits * average_size as f32 / average_rtt.as_secs_f32();
     eprintln!("================= {label} =================");
     eprintln!("Total time|calls server: {total_time:?}|{total_count}");
     eprintln!("Average roundtrip: {average_rtt:?}");
     eprintln!("Average lat: {:?}", average_rtt / 2);
     eprintln!("Average throughput: {:?} bps", throughput);
 
-    println!("NClients,Type,TotalCalls,Time,MicrosPerCall,Latency,Throughput");
+    println!("NClients,Type,TotalCalls,Time,MicrosPerCall,Latency,Throughput,Size");
     let micros_in_sec = 1_000_000.0;
     println!(
-        "{},{},{},{},{},{},{}",
+        "{},{},{},{},{},{},{},{}",
         num_clients,
         label,
         total_count,
         total_time.as_secs_f32() * micros_in_sec,
         average_rtt.as_secs_f32() * micros_in_sec,
         average_rtt.as_secs_f32() * micros_in_sec / 2.0,
-        throughput
+        throughput,
+        average_size
     )
 }
 

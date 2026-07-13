@@ -16,16 +16,16 @@ use tracing_chrome::ChromeLayerBuilder;
 use tracing_subscriber::{prelude::*, registry::Registry};
 
 use crate::server::NumberServerStub;
-use crate::{HASHMAP_LEN, REG_PORT, VEC_LEN};
+use crate::{Config, REG_PORT};
 
 #[allow(unused)]
 #[cfg_attr(feature = "tracing", instrument)]
-fn prep_data() -> (Vec<f64>, HashMap<String, String>, usize) {
+fn prep_data(vec_len: usize, hash_len: usize) -> (Vec<f64>, HashMap<String, String>, usize) {
     #[cfg(feature = "tracing")]
     let span = span!(Level::TRACE, "vec");
     #[cfg(feature = "tracing")]
     let _enter = span.enter();
-    let vector: Vec<f64> = (0..VEC_LEN).map(|_| rand::random::<f64>()).collect();
+    let vector: Vec<f64> = (0..vec_len).map(|_| rand::random::<f64>()).collect();
     #[cfg(feature = "tracing")]
     drop(_enter);
     #[cfg(feature = "tracing")]
@@ -34,7 +34,7 @@ fn prep_data() -> (Vec<f64>, HashMap<String, String>, usize) {
     let _enter = span.enter();
     let mut hashmap = HashMap::<String, String>::new();
     let mut hashmap_size: usize = 0;
-    for i in 0..HASHMAP_LEN {
+    for i in 0..hash_len {
         let value = format!("{:.10}f", rand::random::<f64>());
         let key = format!("{i}");
         hashmap_size += key.len() + value.len();
@@ -48,7 +48,7 @@ fn prep_data() -> (Vec<f64>, HashMap<String, String>, usize) {
 fn send_nums(stub: &NumberServerStub, times: usize) {
     // Warmup
     let _ = stub.barrier_mutex();
-    for _ in 0..100{
+    for _ in 0..100 {
         _ = stub.inc_num().unwrap();
     }
     let _ = stub.barrier_mutex();
@@ -85,30 +85,31 @@ fn send_hashmaps(
     _ = stub.set_done_hash(time, hashmap_size);
 }
 #[cfg_attr(feature = "tracing", instrument)]
-pub fn client(host: &str, nums: usize, vecs: usize, hashmaps: usize) {
+pub fn client(host: &str, config: Config) {
     let reg = get_registry(host, REG_PORT);
     let stub: NumberServerStub = reg
         .lookup("NumberServer")
         .expect("stub lookup failed")
         .into();
-    let (vector, hashmap, hashmap_size) = prep_data();
-    send_nums(&stub, nums);
+    let (vector, hashmap, hashmap_size) = prep_data(config.vec_len, config.hash_len);
+    send_nums(&stub, config.num_nums);
 
     let _ = stub.barrier_mutex();
-    send_vecs(&stub, vecs, &vector);
+    send_vecs(&stub, config.num_vecs, &vector);
 
     let _ = stub.barrier_mutex();
-    send_hashmaps(&stub, hashmaps, &hashmap, hashmap_size);
+    send_hashmaps(&stub, config.num_hash, &hashmap, hashmap_size);
 }
 
 #[cfg_attr(feature = "tracing", instrument)]
-pub fn run_clients_local(num_clients: u8, num_nums: usize, num_vecs: usize, num_hash: usize) {
+pub fn run_clients_local(num_clients: u8, config: Config) {
     let mut handles = vec![];
     for i in 0..num_clients {
+        let config_cloned = config.clone();
         let handle = thread::Builder::new()
             .name(format!("Stub{i}"))
             .spawn(move || {
-                client("localhost", num_nums, num_vecs, num_hash);
+                client("localhost", config_cloned);
             })
             .expect("Could not spawn thread.");
         handles.push(handle);
@@ -119,8 +120,8 @@ pub fn run_clients_local(num_clients: u8, num_nums: usize, num_vecs: usize, num_
 }
 
 #[cfg_attr(feature = "tracing", instrument)]
-pub fn run_clients_remote(num_clients: u8, num_nums: usize, num_vecs: usize, num_hash: usize) {
-    eprintln!("waiting for {num_clients} clients to finish {num_nums} of inc_num, {num_vecs} of send_large_vec and {num_hash} send_hashmap");
+pub fn run_clients_remote(num_clients: u8, config: Config) {
+    eprintln!("waiting for {num_clients} clients to finish {} of inc_num, {} of send_large_vec and {} send_hashmap",config.num_nums,config.num_vecs,config.num_hash);
     let reg = get_registry("localhost", REG_PORT);
     let stub: NumberServerStub = reg
         .lookup("NumberServer")

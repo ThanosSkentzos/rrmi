@@ -6,7 +6,7 @@ use crate::experiment::{
     DoneHashRequest, DoneNumRequest, DoneVecRequest, NullResponse, NumRequest, VecRequest,
 };
 use crate::utils::get_my_hostname;
-use crate::{HASHMAP_LEN, VEC_LEN};
+use crate::Config;
 
 use tonic::transport::Endpoint;
 use tonic::Request;
@@ -15,19 +15,17 @@ use crate::experiment::HashRequest;
 
 pub async fn run_client(
     hostname: &str,
-    num_nums: usize,
-    num_vecs: usize,
-    num_hash: usize,
+    config: Config,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let url = format!("{hostname}:50051");
     eprintln!("{} starting client -> {url}", get_my_hostname());
     let endpoint = Endpoint::from_shared(url).unwrap().tcp_nodelay(true);
     let mut client = BenchmarkClient::connect(endpoint).await?;
 
-    let (vector, hashmap, hashmap_size) = prep_data();
+    let (vector, hashmap, hashmap_size) = prep_data(&config);
     let num_start = Instant::now();
 
-    for _ in 0..num_nums {
+    for _ in 0..config.num_nums {
         let request = Request::new(NumRequest {});
         let _response = client.inc_num(request).await?;
     }
@@ -43,7 +41,7 @@ pub async fn run_client(
 
     // VECTOR
     let vec_start = Instant::now();
-    for _ in 0..num_vecs {
+    for _ in 0..config.num_vecs {
         let request = Request::new(VecRequest {
             vector: vector.clone(),
         });
@@ -60,7 +58,7 @@ pub async fn run_client(
 
     // HASHMAP
     let hash_start = Instant::now();
-    for _ in 0..num_hash {
+    for _ in 0..config.num_hash {
         let request = Request::new(HashRequest {
             hashmap: hashmap.clone(),
         });
@@ -71,9 +69,9 @@ pub async fn run_client(
     let request = Request::new(DoneHashRequest {
         time_hash,
         hashmap_size: hashmap_size as u32,
-        num_nums: num_nums as u32,
-        num_vecs: num_vecs as u32,
-        num_hash: num_hash as u32
+        num_nums: config.num_nums as u32,
+        num_vecs: config.num_vecs as u32,
+        num_hash: config.num_hash as u32,
     });
     let _resp = client.set_done_hash(request).await?;
 
@@ -81,11 +79,11 @@ pub async fn run_client(
     Ok(())
 }
 
-fn prep_data() -> (Vec<f64>, HashMap<String, String>, usize) {
-    let vector: Vec<f64> = (0..VEC_LEN).map(|_| rand::random::<f64>()).collect();
+fn prep_data(config: &Config) -> (Vec<f64>, HashMap<String, String>, usize) {
+    let vector: Vec<f64> = (0..config.vec_len).map(|_| rand::random::<f64>()).collect();
     let mut hashmap = HashMap::<String, String>::new();
     let mut hashmap_size: usize = 0;
-    for i in 0..HASHMAP_LEN {
+    for i in 0..config.hash_len {
         let value = format!("{:.10}f", rand::random::<f64>());
         let key = format!("{i}");
         hashmap_size += key.len() + value.len();

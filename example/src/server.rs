@@ -10,7 +10,7 @@ use std::{
     time::Duration,
 };
 
-use crate::{REG_PORT, VEC_LEN};
+use crate::{Config, REG_PORT, VEC_LEN};
 use rrmi::{create_registry, get_registry, remote::RemoteObject};
 use rrmi_macros::remote_object;
 use thousands::Separable;
@@ -87,11 +87,11 @@ impl NumberServer {
     #[remote]
     #[cfg_attr(feature = "tracing", instrument)]
     fn send_large_vec(&self, _data: Vec<f64>) -> () {
-        // eprintln!(
-        //     "Received large vector of size: {}x{}B",
-        //     _data.len(),
-        //     size_of::<f64>()
-        // )
+        eprintln!(
+            "Received large vector of size: {}x{}B",
+            _data.len(),
+            size_of::<f64>()
+        )
     }
 
     #[remote]
@@ -208,13 +208,7 @@ impl NumberServer {
     }
 }
 
-pub fn server(
-    experiment: fn(u8, usize, usize, usize),
-    num_clients: u8,
-    num_nums: usize,
-    num_vecs: usize,
-    num_hash: usize,
-) {
+pub fn server(experiment: fn(u8, Config), num_clients: u8, config: Config) {
     // CREATE REGISTRY
     let port = REG_PORT;
     eprintln!("Creating Registry");
@@ -227,8 +221,11 @@ pub fn server(
 
     // RUN EXPERIMENT
     let t = Instant::now();
-    eprintln!("Running experiment with {num_clients} clients and {num_nums} numbers sent");
-    experiment(num_clients, num_nums, num_vecs, num_hash);
+    eprintln!(
+        "Running experiment with {num_clients} clients and {} numbers sent",
+        config.num_nums
+    );
+    experiment(num_clients, config.clone());
     let time = t.elapsed();
 
     // FINAL NUMBER
@@ -256,16 +253,16 @@ pub fn server(
 
     let num_time = num_server.get_num_info();
     let num_size = size_of_val(&final_num);
-    let num_count = num_clients as usize * num_nums;
+    let num_count = num_clients as usize * config.num_nums;
     print_statistics(num_clients, "Sequence", num_time, num_count, num_size);
 
     let vecs_time = num_server.get_arr_info();
     let vec_size = size_of::<f64>() * VEC_LEN;
-    let vec_count = num_clients as usize * num_vecs;
+    let vec_count = num_clients as usize * config.num_vecs;
     print_statistics(num_clients, "Vector", vecs_time, vec_count, vec_size);
 
     let (hash_time, hashmaps_size) = num_server.get_hashmap_info();
-    let hash_count = num_clients as usize * num_hash;
+    let hash_count = num_clients as usize * config.num_hash;
     let hash_avg_size = hashmaps_size / hash_count;
     print_statistics(num_clients, "Hashmap", hash_time, hash_count, hash_avg_size);
 }
@@ -275,27 +272,28 @@ fn print_statistics(
     label: &str,
     total_time: Duration,
     total_count: usize,
-    avegare_size: usize,
+    average_size_bytes: usize,
 ) {
     let bytes_to_bits: f32 = 8.0;
     let average_rtt = total_time / total_count as u32;
-    let throughput = bytes_to_bits * avegare_size as f32 / average_rtt.as_secs_f32();
+    let throughput = bytes_to_bits * average_size_bytes as f32 / average_rtt.as_secs_f32();
     eprintln!("================= {label} =================");
     eprintln!("Total time|calls server: {total_time:?}|{total_count}");
     eprintln!("Average roundtrip: {average_rtt:?}");
     eprintln!("Average lat: {:?}", average_rtt / 2);
     eprintln!("Average throughput: {:?} bps", throughput);
 
-    println!("NClients,Type,TotalCalls,Time,MicrosPerCall,Latency,Throughput");
+    println!("NClients,Type,TotalCalls,Time,MicrosPerCall,Latency,Throughput,Size");
     let micros_in_sec = 1_000_000.0;
     println!(
-        "{},{},{},{},{},{},{}",
+        "{},{},{},{},{},{},{},{}",
         num_clients,
         label,
         total_count,
         total_time.as_secs_f32() * micros_in_sec,
         average_rtt.as_secs_f32() * micros_in_sec,
         average_rtt.as_secs_f32() * micros_in_sec / 2.0,
-        throughput
+        throughput,
+        average_size_bytes
     )
 }

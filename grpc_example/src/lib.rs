@@ -2,8 +2,8 @@ pub mod experiment {
     tonic::include_proto!("numberserver");
 }
 pub static NUM_NUMS: usize = 1_000;
-pub static NUM_VECS: usize = 5;
-pub static NUM_HASH: usize = 5;
+pub static NUM_VECS: usize = 10;
+pub static NUM_HASH: usize = 10;
 pub static NUM_CLIENTS_LOCAL: u8 = 2;
 pub static REG_PORT: u16 = 1099;
 

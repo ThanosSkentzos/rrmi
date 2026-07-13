@@ -2,7 +2,7 @@ pub mod client;
 pub mod server;
 pub mod utils;
 
-pub static NUM_NUMS: usize = 100_000;
+pub static NUM_NUMS: usize = 10_000;
 pub static NUM_VECS: usize = 10;
 pub static NUM_HASH: usize = 10;
 pub static NUM_CLIENTS_LOCAL: u8 = 2;

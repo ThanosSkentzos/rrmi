@@ -7,7 +7,7 @@ cargo build --release
 out=results_vec_grpc.csv
 
 
-for size in $(seq 1 27)
+for size in $(seq 1 18)
 
 do
   echo running size 2^$size

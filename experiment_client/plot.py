@@ -5,12 +5,13 @@ import os
 
 os.makedirs("plots",exist_ok=True)
 # print("Reading data")
-eth_rust = pd.read_csv("results/results_rust.csv", index_col=False)
-eth_rust_grpc = pd.read_csv("results/results_rust_grpc.csv", index_col=False)
-eth_java = pd.read_csv("results/results_java.csv", index_col=False)
-ib_rust = pd.read_csv("results/results_rust_ib.csv", index_col=False)
-ib_java = pd.read_csv("results/results_java_ib.csv", index_col=False)
-ib_rust_grpc = pd.read_csv("results/results_rust_grpc_ib.csv", index_col=False)
+folder = "experiment_client"
+eth_rust = pd.read_csv(f"{folder}/results_rust.csv", index_col=False)
+eth_rust_grpc = pd.read_csv(f"{folder}/results_rust_grpc.csv", index_col=False)
+eth_java = pd.read_csv(f"{folder}/results_java.csv", index_col=False)
+ib_rust = pd.read_csv(f"{folder}/results_rust_ib.csv", index_col=False)
+ib_java = pd.read_csv(f"{folder}/results_java_ib.csv", index_col=False)
+ib_rust_grpc = pd.read_csv(f"{folder}/results_rust_grpc_ib.csv", index_col=False)
 
 # df.columns = [
 #     "Number of Clients",

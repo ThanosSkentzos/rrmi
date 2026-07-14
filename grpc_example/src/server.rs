@@ -13,7 +13,6 @@ use crate::experiment::{
     NumRequest, NumResponse, VecRequest, VecResponse,
 };
 use crate::utils::get_my_hostname;
-use crate::VEC_LEN;
 
 #[derive(Debug)]
 pub struct NumberServer {
@@ -105,6 +104,7 @@ impl Benchmark for NumberServer {
         let num_nums = request.num_nums as usize;
         let num_vecs = request.num_vecs as usize;
         let num_hash = request.num_hash as usize;
+        let vec_len = request.vec_len as usize;
         // println!("Got a done_hash request");
 
         let this_clients_time = Duration::from_secs_f32(time);
@@ -115,7 +115,7 @@ impl Benchmark for NumberServer {
         let num_done = self.num_clients_done.load(SeqCst);
         eprintln!("{num_done}/{}", 3 * self.total_clients as u32);
         if num_done == self.total_clients as u32 * 3 {
-            self.print_results(num_nums, num_vecs, num_hash).await;
+            self.print_results(num_nums, num_vecs, num_hash, vec_len).await;
             sleep(Duration::from_secs(1));
             self.shutdown.notify_one();
             //TODO: print all statistics
@@ -166,7 +166,7 @@ impl NumberServer {
         (time.clone(), size.clone())
     }
 
-    async fn print_results(&self, num_nums: usize, num_vecs: usize, num_hash: usize) {
+    async fn print_results(&self, num_nums: usize, num_vecs: usize, num_hash: usize, vec_len: usize) {
         eprintln!("================= SERVER =================");
 
         let num_clients = self.total_clients;
@@ -178,14 +178,16 @@ impl NumberServer {
         print_statistics(num_clients, "Sequence", num_time, num_count, num_size);
 
         let vecs_time = self.get_arr_info().await;
-        let vec_size = size_of::<f64>() * VEC_LEN;
+        let vec_size = size_of::<f64>() * vec_len;
         let vec_count = num_clients as usize * num_vecs;
         print_statistics(num_clients, "Vector", vecs_time, vec_count, vec_size);
 
         let (hash_time, hashmaps_size) = self.get_hashmap_info().await;
         let hash_count = num_clients as usize * num_hash;
-        let hash_avg_size = hashmaps_size / hash_count;
-        print_statistics(num_clients, "Hashmap", hash_time, hash_count, hash_avg_size);
+        if hash_count > 0 {
+            let hash_avg_size = hashmaps_size / hash_count;
+            print_statistics(num_clients, "Hashmap", hash_time, hash_count, hash_avg_size);
+        }
     }
 }
 
@@ -197,6 +199,9 @@ fn print_statistics(
     average_size: usize,
 ) {
     let bytes_to_bits: f32 = 8.0;
+    if total_count == 0 {
+        return;
+    }
     let average_rtt = total_time / total_count as u32;
     let throughput = bytes_to_bits * average_size as f32 / average_rtt.as_secs_f32();
     eprintln!("================= {label} =================");
@@ -220,9 +225,7 @@ fn print_statistics(
     )
 }
 
-pub async fn run_server(
-    num_clients: u8,
-) -> Result<(), Box<dyn std::error::Error + Sync + Send>> {
+pub async fn run_server(num_clients: u8) -> Result<(), Box<dyn std::error::Error + Sync + Send>> {
     eprintln!("{} starting server", get_my_hostname());
     let addr = "[::]:50051".parse()?;
     let server = NumberServer::new(num_clients);

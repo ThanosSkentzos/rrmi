@@ -72,6 +72,7 @@ pub async fn run_client(
         num_nums: config.num_nums as u32,
         num_vecs: config.num_vecs as u32,
         num_hash: config.num_hash as u32,
+        vec_len: config.vec_len as u32,
     });
     let _resp = client.set_done_hash(request).await?;
 

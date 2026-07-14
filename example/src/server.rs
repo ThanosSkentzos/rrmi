@@ -10,7 +10,7 @@ use std::{
     time::Duration,
 };
 
-use crate::{Config, REG_PORT, VEC_LEN};
+use crate::{Config, REG_PORT};
 use rrmi::{create_registry, get_registry, remote::RemoteObject};
 use rrmi_macros::remote_object;
 use thousands::Separable;
@@ -257,7 +257,7 @@ pub fn server(experiment: fn(u8, Config), num_clients: u8, config: Config) {
     print_statistics(num_clients, "Sequence", num_time, num_count, num_size);
 
     let vecs_time = num_server.get_arr_info();
-    let vec_size = size_of::<f64>() * VEC_LEN;
+    let vec_size = size_of::<f64>() * config.vec_len;
     let vec_count = num_clients as usize * config.num_vecs;
     print_statistics(num_clients, "Vector", vecs_time, vec_count, vec_size);
 

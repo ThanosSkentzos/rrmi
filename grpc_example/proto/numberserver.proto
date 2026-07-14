@@ -9,6 +9,7 @@ service Benchmark {
     rpc SetDoneVec (DoneVecRequest) returns (NullResponse);
     rpc SetDoneHash (DoneHashRequest) returns (NullResponse);
     rpc Barrier (NullResponse) returns (NullResponse);
+    rpc ShutDown(NullResponse) returns (NullResponse);  
 }
 
 message NumRequest {
@@ -50,4 +51,7 @@ message DoneHashRequest{
 }
 
 message NullResponse{
+}
+
+message ShutDown{
 }

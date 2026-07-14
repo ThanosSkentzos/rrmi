@@ -32,7 +32,7 @@ pub async fn run_client(
     let time_num = num_start.elapsed().as_secs_f32();
     let request = Request::new(DoneNumRequest { time_num });
     let _response = client.set_done_num(request).await?;
-    eprintln!("{_response:?}");
+    eprintln!("got num response: {_response:?}");
 
     let request = Request::new(NullResponse {});
     let _ = client.barrier(request).await?;
@@ -47,7 +47,7 @@ pub async fn run_client(
         });
         let _response = client.send_vec(request).await?;
     }
-    eprintln!("{_response:?}");
+    eprintln!("got vec response{_response:?}");
     let time_vec = vec_start.elapsed().as_secs_f32();
     let request = Request::new(DoneVecRequest { time_vec });
     let _ = client.set_done_vec(request).await?;
@@ -64,7 +64,7 @@ pub async fn run_client(
         });
         let _response = client.send_hashmap(request).await?;
     }
-    eprintln!("{_response:?}");
+    eprintln!("got hash reponse {_response:?}");
     let time_hash = hash_start.elapsed().as_secs_f32();
     let request = Request::new(DoneHashRequest {
         time_hash,

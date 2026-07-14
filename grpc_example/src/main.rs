@@ -1,13 +1,19 @@
+use std::sync::Arc;
 use std::thread::sleep;
 use std::{process::exit, time::Duration};
 
 use clap::Parser;
 
+use grpc_example::experiment::benchmark_client::BenchmarkClient;
+use grpc_example::experiment::NullResponse;
 #[cfg(feature = "infiniband")]
 use grpc_example::utils::get_ib_hostname;
 use grpc_example::Config;
 use grpc_example::{client::run_client, server::run_server, utils::Utils, NUM_CLIENTS_LOCAL};
+use tokio::sync::Notify;
 use tokio::task::JoinSet;
+use tonic::transport::Endpoint;
+use tonic::Request;
 
 #[tokio::main]
 async fn main() {
@@ -25,7 +31,10 @@ async fn main() {
 }
 
 async fn run_local(config: Config) {
-    let _sever_handle = tokio::spawn(async move { run_server(NUM_CLIENTS_LOCAL).await });
+    let shutdown = Arc::new(Notify::new());
+    let shutdown_cloned = shutdown.clone();
+    let _sever_handle =
+        tokio::spawn(async move { run_server(NUM_CLIENTS_LOCAL, shutdown_cloned).await });
     let mut set = JoinSet::new();
     for _ in 0..NUM_CLIENTS_LOCAL {
         let config_cloned = config.clone();
@@ -37,7 +46,10 @@ async fn run_local(config: Config) {
     while let Some(_res) = set.join_next().await {
         match _res {
             Ok(Ok(())) => {}
-            Ok(Err(e)) => eprintln!("Client error: {e}"),
+            Ok(Err(e)) => {
+                eprintln!("Client error: {e}");
+                shutdown.notify_one();
+            }
             Err(e) => eprintln!("task panicked: {e}"),
         }
         finished += 1;
@@ -61,9 +73,23 @@ async fn run_remote(config: Config) {
     let hostname = get_ib_hostname(&hostname);
     let hostname = format!("http://{}", hostname);
     if util.am_i_slurm_coordinator() {
-        _ = run_server(num_clients).await;
+        let shutdown = Arc::new(Notify::new());
+        _ = run_server(num_clients, shutdown).await;
     } else {
         sleep(Duration::from_secs(1));
-        _ = run_client(&hostname, config).await;
+        match run_client(&hostname, config).await {
+            Ok(()) => {}
+            Err(e) => {
+                eprintln!("Client error: {e}");
+                // somehow need to notify server to shutdown
+                let url = format!("{hostname}:50051");
+                let endpoint = Endpoint::from_shared(url).unwrap().tcp_nodelay(true);
+                let mut client = BenchmarkClient::connect(endpoint)
+                    .await
+                    .expect("Could not notify server of client error");
+                let request = Request::new(NullResponse {});
+                client.shut_down(request).await.unwrap();
+            }
+        }
     }
 }

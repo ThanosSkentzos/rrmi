@@ -115,10 +115,10 @@ impl Benchmark for NumberServer {
         let num_done = self.num_clients_done.load(SeqCst);
         eprintln!("{num_done}/{}", 3 * self.total_clients as u32);
         if num_done == self.total_clients as u32 * 3 {
-            self.print_results(num_nums, num_vecs, num_hash, vec_len).await;
+            self.print_results(num_nums, num_vecs, num_hash, vec_len)
+                .await;
             sleep(Duration::from_secs(1));
             self.shutdown.notify_one();
-            //TODO: print all statistics
         }
 
         let reply = NullResponse {};
@@ -133,10 +133,19 @@ impl Benchmark for NumberServer {
         let reply = NullResponse {};
         Ok(Response::new(reply))
     }
+
+    async fn shut_down(
+        &self,
+        _request: Request<NullResponse>,
+    ) -> Result<Response<NullResponse>, Status> {
+        self.shutdown.notify_one();
+        let reply = NullResponse {};
+        Ok(Response::new(reply))
+    }
 }
 
 impl NumberServer {
-    fn new(total_clients: u8) -> Self {
+    fn new(total_clients: u8, shutdown: Arc<Notify>) -> Self {
         Self {
             total_clients,
             number: AtomicU32::new(0),
@@ -145,7 +154,7 @@ impl NumberServer {
             time_vec: Mutex::new(Duration::new(0, 0)),
             time_hash: Mutex::new(Duration::new(0, 0)),
             num_clients_done: AtomicU32::new(0),
-            shutdown: Arc::new(Notify::default()),
+            shutdown,
             hashmap_total_size: Mutex::new(0),
         }
     }
@@ -166,7 +175,13 @@ impl NumberServer {
         (time.clone(), size.clone())
     }
 
-    async fn print_results(&self, num_nums: usize, num_vecs: usize, num_hash: usize, vec_len: usize) {
+    async fn print_results(
+        &self,
+        num_nums: usize,
+        num_vecs: usize,
+        num_hash: usize,
+        vec_len: usize,
+    ) {
         eprintln!("================= SERVER =================");
 
         let num_clients = self.total_clients;
@@ -225,11 +240,14 @@ fn print_statistics(
     )
 }
 
-pub async fn run_server(num_clients: u8) -> Result<(), Box<dyn std::error::Error + Sync + Send>> {
+pub async fn run_server(
+    num_clients: u8,
+    shutdown: Arc<Notify>,
+) -> Result<(), Box<dyn std::error::Error + Sync + Send>> {
     eprintln!("{} starting server", get_my_hostname());
     let addr = "[::]:50051".parse()?;
-    let server = NumberServer::new(num_clients);
-    let shutdown = server.shutdown.clone();
+    let server = NumberServer::new(num_clients, shutdown.clone());
+    // let shutdown = server.shutdown.clone();
     Server::builder()
         .tcp_nodelay(true)
         .add_service(BenchmarkServer::new(server))

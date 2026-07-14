@@ -89,7 +89,7 @@ def plot(df,cols,ax,color,linestyles,markers,text):
 
 plot(eth_rust,cols,eth_ax,o,linestyles,markers,"")
 plot(eth_java,cols,eth_ax,b,linestyles,markers,"")
-plot(eth_rust_grpc,cols,eth_ax,g,linestyles,markers)
+plot(eth_rust_grpc,cols,eth_ax,g,linestyles,markers,"")
 
 plot(ib_rust,cols,ib_ax,o,linestyles,markers,"")
 plot(ib_java,cols,ib_ax,b,linestyles,markers,"")

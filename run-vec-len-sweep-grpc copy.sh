@@ -1,9 +1,10 @@
 #!/bin/bash
 
 reps=10
+
 rm -f out.* err.*
-cargo build --release
-out=results_vec_rrmi.csv
+cargo build --release --features infiniband
+out=results_vec_grpc_ib.csv
 
 
 for size in $(seq 1 27)
@@ -13,7 +14,7 @@ do
   for n in $(seq 1 $reps)
   do
     vec_size=$(( 2 ** $size ))
-    srun -N 2 -J $"vec_2^$size" run_vec.sh --vec-len $vec_size> out.$size.$n 2> err.$size.$n &
+    srun -N 2 -J $"vec_2^$size" run_vec_grpc.sh --vec-len $vec_size> out.$size.$n 2> err.$size.$n &
   done
   wait
 

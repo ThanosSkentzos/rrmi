@@ -263,8 +263,10 @@ pub fn server(experiment: fn(u8, Config), num_clients: u8, config: Config) {
 
     let (hash_time, hashmaps_size) = num_server.get_hashmap_info();
     let hash_count = num_clients as usize * config.num_hash;
-    let hash_avg_size = hashmaps_size / hash_count;
-    print_statistics(num_clients, "Hashmap", hash_time, hash_count, hash_avg_size);
+    if hash_count > 0 {
+        let hash_avg_size = hashmaps_size / hash_count;
+        print_statistics(num_clients, "Hashmap", hash_time, hash_count, hash_avg_size);
+    }
 }
 
 fn print_statistics(
@@ -275,6 +277,9 @@ fn print_statistics(
     average_size_bytes: usize,
 ) {
     let bytes_to_bits: f32 = 8.0;
+    if total_count == 0 {
+        return;
+    }
     let average_rtt = total_time / total_count as u32;
     let throughput = bytes_to_bits * average_size_bytes as f32 / average_rtt.as_secs_f32();
     eprintln!("================= {label} =================");

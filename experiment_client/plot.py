@@ -59,8 +59,14 @@ linestyle_values = ['dotted','solid','dashed']
 linestyles = dict(zip(type_keys,linestyle_values))
 marker_values = ['.','s','^']
 markers = dict(zip(type_keys,marker_values))
+global m_list
+global s_list
+l_list=[]
+t_list=[]
+ls_list=[]
+ts_list=[]
 
-def plot(df,cols,ax,color,linestyles,markers,text):
+def plot(df,cols,ax,color,linestyles,markers,framework):
     for t, sub in df.groupby(["Type"],sort=False)[cols]:
         sub = sub.sort_values('NClients')
         mean = sub.groupby(['NClients']).mean()
@@ -69,7 +75,7 @@ def plot(df,cols,ax,color,linestyles,markers,text):
 
         linestyle = linestyles[t[0]]
         marker = markers[t[0]]
-        label = t[0] + text
+        label = t[0]
 
         for c,a in zip(mean.columns,ax):
             m = mean[c]
@@ -80,7 +86,7 @@ def plot(df,cols,ax,color,linestyles,markers,text):
 
             a.set_xlabel('Number of Clients')
             a.legend(
-                title = "This work"+" "*25+"Java RMI"+" "*35+"gRPC"+" "*10,
+                title = " "*10 + "This work"+" "*20+"Java RMI"+" "*25+"gRPC"+" "*10,
                 ncol=3,shadow=True, 
                 bbox_to_anchor = (0.1,0.12,0.4,.47),
                 loc="center left"
@@ -88,13 +94,28 @@ def plot(df,cols,ax,color,linestyles,markers,text):
             a.grid(True, alpha=0.3)
             a.set_yscale("log")
 
-plot(eth_rust,cols,eth_ax,o,linestyles,markers,"")
-plot(eth_java,cols,eth_ax,b,linestyles,markers,"")
-plot(eth_rust_grpc,cols,eth_ax,g,linestyles,markers,"")
+            type = m.name
+            m.name = framework + "_" +  t[0]
+            s.name = framework + "_" +  t[0]
+            if type=="Latency":
+                l_list.append(m)
+                ls_list.append(s)
+            else:
+                t_list.append(m)
+                ts_list.append(s)
 
-plot(ib_rust,cols,ib_ax,o,linestyles,markers,"")
-plot(ib_java,cols,ib_ax,b,linestyles,markers,"")
-plot(ib_rust_grpc,cols,ib_ax,g,linestyles,markers,"")
+plot(eth_rust,cols,eth_ax,o,linestyles,markers,"rrmi")
+plot(eth_java,cols,eth_ax,b,linestyles,markers,"Java RMI")
+plot(eth_rust_grpc,cols,eth_ax,g,linestyles,markers,"gRPC")
+
+plot(ib_rust,cols,ib_ax,o,linestyles,markers,"rrmi (ib)")
+plot(ib_java,cols,ib_ax,b,linestyles,markers,"Java RMI (ib)")
+plot(ib_rust_grpc,cols,ib_ax,g,linestyles,markers,"gRPC (ib)")
+
+latency = pd.concat(l_list,axis=1)
+throughput = pd.concat(t_list,axis=1)
+print(latency)
+print(throughput)
 
 ax_lat.set_ylabel('Average Latency (μsec)')
 ax_lat.set_title('Average Latency vs Number of Clients - Using Ethernet')

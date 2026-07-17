@@ -57,17 +57,21 @@ marker_values = ['^','s'] *2
 markers = dict(zip(type_keys,marker_values))
 
 x_key = "Size"
-def plot(df,cols,ax,color,linestyles,markers,text):
+l_list=[]
+t_list=[]
+ls_list=[]
+ts_list=[]
+def plot(df,cols,ax,color,linestyles,markers,framework):
     sub = df[cols]
     sub = sub.sort_values(x_key)
     mean = sub.groupby([x_key]).mean()
     std = sub.groupby([x_key]).std()
     num_clients = mean.index.values
 
-    linestyle = linestyles[text]
-    marker = markers[text]
+    linestyle = linestyles[framework]
+    marker = markers[framework]
     # color = colors[text]
-    label = text
+    label = framework
 
     for c,a in zip(mean.columns,ax):
         m = mean[c]
@@ -81,18 +85,33 @@ def plot(df,cols,ax,color,linestyles,markers,text):
         a.legend(
             title = " "*5+"This work"+" "*10+"gRPC"+" "*10,
             ncol=2,shadow=True, 
-            bbox_to_anchor = (0.1,0.12,0.4,.47),
-            loc="center left"
+            # bbox_to_anchor = (0.1,0.12,0.4,.47),
+            loc="center right"
             )
         a.grid(True, alpha=0.3)
         a.set_yscale("log")
         a.set_xscale("log",base=2,)
+
+        type = m.name
+        m.name = framework + "_"
+        s.name = framework + "_"
+        if type=="Latency":
+            l_list.append(m)
+            ls_list.append(s)
+        else:
+            t_list.append(m)
+            ts_list.append(s)
 
 plot(eth_rust,cols,eth_ax,o,linestyles,markers,"rrmi")
 plot(ib_rust,cols,eth_ax,o,linestyles,markers,"rrmi"+ib_text)
 
 plot(eth_rust_grpc,cols,eth_ax,g,linestyles,markers,"grpc")
 plot(ib_rust_grpc,cols,eth_ax,g,linestyles,markers,"grpc"+ib_text)
+
+latency = pd.concat(l_list,axis=1)
+throughput = pd.concat(t_list,axis=1)
+print(latency)
+print(throughput)
 
 eth_ax[0].axvline(2**22,color=g,linestyle="dashed")
 eth_ax[1].axvline(2**22,color=g,linestyle='dashed')
